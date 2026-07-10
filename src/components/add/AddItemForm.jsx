@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { indiaFirstCategories, paymentModes, statuses } from '../../data/lifeAdminConstants'
+import { getStatusMeta, indiaFirstCategories, paymentModes } from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -25,6 +25,19 @@ const defaultValuesByType = {
     status: 'unpaid',
     paymentMode: 'UPI',
     category: 'Electricity',
+    notes: '',
+  },
+  insurance: {
+    title: '',
+    policyType: '',
+    insurerName: '',
+    policyNumber: '',
+    premiumAmount: '',
+    dueDate: '',
+    frequency: 'yearly',
+    paymentMode: 'UPI',
+    status: 'unpaid',
+    category: 'Insurance',
     notes: '',
   },
   vendor: {
@@ -74,16 +87,25 @@ const defaultValuesByType = {
 }
 
 const statusOptionsByType = {
-  subscription: ['pending', 'paid', 'overdue'],
+  subscription: ['pending', 'unpaid', 'paid', 'overdue'],
   bill: ['unpaid', 'paid', 'overdue'],
-  vendor: ['unpaid', 'paid'],
+  insurance: ['unpaid', 'paid', 'overdue'],
+  vendor: ['unpaid', 'paid', 'overdue'],
   complaint: ['open', 'followed_up', 'resolved', 'closed'],
   expense: ['paid', 'pending'],
-  document: ['pending', 'closed', 'archived'],
+  document: ['pending', 'closed'],
 }
 
-const frequencyOptions = ['monthly', 'quarterly', 'yearly', 'one-time']
-const billingCycleOptions = ['monthly', 'yearly']
+const frequencyOptions = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'six_monthly', label: 'Six-monthly' },
+  { value: 'yearly', label: 'Yearly' },
+  { value: 'one_time', label: 'One-time' },
+]
+const billingCycleOptions = frequencyOptions.filter(
+  (option) => option.value !== 'one_time',
+)
 
 const toNumber = (value) => (value === '' ? 0 : Number(value))
 
@@ -181,7 +203,7 @@ function AddItemForm({
         {selectedType === 'subscription' && (
           <>
             <Field label="Title" error={showError('title')}>
-              <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="ChatGPT subscription" />
+              <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="Netflix, Prime, Hotstar..." />
             </Field>
             <TwoFields>
               <Field label="Amount" error={showError('amount')}>
@@ -194,7 +216,7 @@ function AddItemForm({
             <TwoFields>
               <Field label="Cycle">
                 <SelectInput value={form.billingCycle} onChange={(event) => updateField('billingCycle', event.target.value)}>
-                  {billingCycleOptions.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}
+                  {billingCycleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </SelectInput>
               </Field>
               <Field label="Auto-renew">
@@ -226,10 +248,50 @@ function AddItemForm({
             </TwoFields>
             <Field label="Frequency">
               <SelectInput value={form.frequency} onChange={(event) => updateField('frequency', event.target.value)}>
-                {frequencyOptions.map((option) => <option key={option} value={option}>{labelize(option)}</option>)}
+                {frequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </SelectInput>
             </Field>
             <CommonMoneyFields form={form} updateField={updateField} statusOptions={statusOptions} />
+          </>
+        )}
+
+        {selectedType === 'insurance' && (
+          <>
+            <Field label="Title" error={showError('title')}>
+              <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="Health insurance premium" />
+            </Field>
+            <TwoFields>
+              <Field label="Premium" error={showError('premiumAmount')}>
+                <TextInput type="number" min="0" inputMode="decimal" value={form.premiumAmount} onChange={(event) => updateField('premiumAmount', event.target.value)} />
+              </Field>
+              <Field label="Due date" error={showError('dueDate')}>
+                <TextInput type="date" value={form.dueDate} onChange={(event) => updateField('dueDate', event.target.value)} />
+              </Field>
+            </TwoFields>
+            <TwoFields>
+              <Field label="Policy type">
+                <TextInput value={form.policyType} onChange={(event) => updateField('policyType', event.target.value)} placeholder="Health, car, term" />
+              </Field>
+              <Field label="Frequency">
+                <SelectInput value={form.frequency} onChange={(event) => updateField('frequency', event.target.value)}>
+                  {frequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </SelectInput>
+              </Field>
+            </TwoFields>
+            <Field label="Insurer">
+              <TextInput value={form.insurerName} onChange={(event) => updateField('insurerName', event.target.value)} placeholder="LIC, HDFC Ergo, etc." />
+            </Field>
+            <Field label="Policy number">
+              <TextInput value={form.policyNumber} onChange={(event) => updateField('policyNumber', event.target.value)} />
+            </Field>
+            <TwoFields>
+              <Field label="Status">
+                <StatusSelect value={form.status} options={statusOptions} onChange={(value) => updateField('status', value)} />
+              </Field>
+              <Field label="Payment">
+                <PaymentSelect value={form.paymentMode} onChange={(value) => updateField('paymentMode', value)} />
+              </Field>
+            </TwoFields>
           </>
         )}
 
@@ -430,7 +492,7 @@ function StatusSelect({ onChange, options, value }) {
     <SelectInput value={value} onChange={(event) => onChange(event.target.value)}>
       {options.map((status) => (
         <option key={status} value={status}>
-          {statuses.find((item) => item.id === status)?.label ?? labelize(status)}
+          {getStatusMeta(status).label ?? labelize(status)}
         </option>
       ))}
     </SelectInput>
@@ -454,6 +516,12 @@ function validateForm(type, form) {
   if (type === 'bill') {
     if (!form.title.trim()) errors.title = 'Title is required.'
     positiveAmount('amount')
+    if (!form.dueDate) errors.dueDate = 'Due date is required.'
+  }
+
+  if (type === 'insurance') {
+    if (!form.title.trim()) errors.title = 'Title is required.'
+    positiveAmount('premiumAmount', 'Premium')
     if (!form.dueDate) errors.dueDate = 'Due date is required.'
   }
 
@@ -498,7 +566,7 @@ function buildLifeItem(type, form) {
       type,
       amount: toNumber(form.amount),
       autoRenewal: form.autoRenewal === 'yes',
-      billingCycle: labelize(form.billingCycle),
+      billingCycle: form.billingCycle,
       dueDate: form.renewalDate,
     }
   }
@@ -508,7 +576,17 @@ function buildLifeItem(type, form) {
       ...form,
       type,
       amount: toNumber(form.amount),
-      frequency: labelize(form.frequency),
+      frequency: form.frequency,
+    }
+  }
+
+  if (type === 'insurance') {
+    return {
+      ...form,
+      type,
+      amount: toNumber(form.premiumAmount),
+      premiumAmount: toNumber(form.premiumAmount),
+      category: 'Insurance',
     }
   }
 
@@ -578,6 +656,14 @@ function getInitialForm(type, initialItem) {
     }
   }
 
+  if (type === 'insurance') {
+    return {
+      ...baseForm,
+      premiumAmount: initialItem.premiumAmount || initialItem.amount || '',
+      frequency: normalizeOption(initialItem.frequency, 'yearly'),
+    }
+  }
+
   if (type === 'vendor') {
     return {
       ...baseForm,
@@ -598,12 +684,23 @@ function getInitialForm(type, initialItem) {
 }
 
 function normalizeOption(value, fallback) {
-  return String(value || fallback).toLowerCase().replaceAll(' ', '-')
+  return String(value || fallback)
+    .toLowerCase()
+    .replaceAll(' ', '_')
+    .replaceAll('-', '_')
 }
 
 function labelize(value) {
-  return value
-    .split('-')
+  if (value === 'six_monthly') {
+    return 'Six-monthly'
+  }
+
+  if (value === 'one_time') {
+    return 'One-time'
+  }
+
+  return String(value)
+    .split(/[-_]/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }

@@ -13,7 +13,7 @@ function ItemTypeCard({ description, emoji, label, onSelect }) {
           <h2 className="text-sm font-semibold text-stone-950">{label}</h2>
           <p className="mt-1 text-xs leading-5 text-stone-500">{description}</p>
         </div>
-        <span className="pt-1 text-lg leading-none text-stone-400">›</span>
+        <span className="pt-1 text-lg leading-none text-stone-400" aria-hidden="true">›</span>
       </div>
     </button>
   )

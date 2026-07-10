@@ -18,12 +18,24 @@ const pages = {
 
 function App() {
   const [activePage, setActivePage] = useState('home')
+  const [pendingAddType, setPendingAddType] = useState('')
 
   const CurrentPage = pages[activePage]
 
+  function handleNavigate(nextPage) {
+    if (typeof nextPage === 'object') {
+      setPendingAddType(nextPage.type || '')
+      setActivePage(nextPage.page)
+      return
+    }
+
+    setPendingAddType('')
+    setActivePage(nextPage)
+  }
+
   return (
-    <AppShell activePage={activePage} onNavigate={setActivePage}>
-      <CurrentPage onNavigate={setActivePage} />
+    <AppShell activePage={activePage} onNavigate={handleNavigate}>
+      <CurrentPage initialType={pendingAddType} onNavigate={handleNavigate} />
     </AppShell>
   )
 }

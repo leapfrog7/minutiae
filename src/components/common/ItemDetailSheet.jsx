@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import AddItemForm from '../add/AddItemForm'
-import { statuses } from '../../data/lifeAdminConstants'
+import { getStatusMeta } from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
 import {
   formatAmount,
+  formatCycleLabel,
   formatDisplayDate,
+  getQuickStatusAction,
   getRelevantDate,
 } from '../../features/lifeItems/lifeItemHelpers'
 import {
@@ -25,11 +27,8 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   }
 
   const typeMeta = getItemTypeMeta(item.type)
-  const statusMeta = statuses.find((status) => status.id === item.status) ?? {
-    label: item.status,
-    tone: 'slate',
-  }
-  const quickAction = getQuickAction(item)
+  const statusMeta = getStatusMeta(item.status)
+  const quickAction = getQuickStatusAction(item)
 
   function handleQuickAction() {
     if (!quickAction) {
@@ -38,7 +37,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
 
     const updates = { status: quickAction.status }
 
-    if (['bill', 'vendor', 'subscription'].includes(item.type)) {
+    if (['bill', 'vendor', 'subscription', 'insurance'].includes(item.type)) {
       updates.paidDate = today()
     }
 
@@ -61,7 +60,10 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   return (
     <>
       <div className="fixed inset-0 z-20 bg-stone-950/30" onClick={onClose} />
-      <aside className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20">
+      <aside
+        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20"
+        aria-label="Item details"
+      >
         <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-stone-300" />
 
         {isEditing ? (
@@ -79,7 +81,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
                   {typeMeta.emoji} {typeMeta.label}
                 </p>
-                <h2 className="mt-1 text-xl font-bold text-stone-950">
+                <h2 className="mt-1 break-words text-lg font-bold text-stone-950">
                   {item.title}
                 </h2>
               </div>
@@ -87,6 +89,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
                 type="button"
                 onClick={onClose}
                 className="rounded-full bg-stone-200 px-3 py-2 text-xs font-bold text-stone-700"
+                aria-label="Close item details"
               >
                 Close
               </button>
@@ -170,54 +173,33 @@ function DetailRow({ label, value }) {
       <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500">
         {label}
       </p>
-      <p className="mt-1 text-sm font-medium text-stone-900">{displayValue}</p>
+      <p className="mt-1 break-words text-sm font-medium text-stone-900">{displayValue}</p>
     </div>
   )
-}
-
-function getQuickAction(item) {
-  if (item.type === 'bill' && ['unpaid', 'overdue'].includes(item.status)) {
-    return { label: 'Mark Paid', status: 'paid' }
-  }
-
-  if (item.type === 'vendor' && item.status === 'unpaid') {
-    return { label: 'Mark Paid', status: 'paid' }
-  }
-
-  if (
-    item.type === 'subscription' &&
-    ['pending', 'unpaid'].includes(item.status)
-  ) {
-    return { label: 'Mark Paid', status: 'paid' }
-  }
-
-  if (
-    item.type === 'complaint' &&
-    ['open', 'followed_up', 'follow-up'].includes(item.status)
-  ) {
-    return { label: 'Mark Resolved', status: 'resolved' }
-  }
-
-  if (item.type === 'document' && item.status === 'pending') {
-    return { label: 'Mark Closed', status: 'closed' }
-  }
-
-  return null
 }
 
 function getSpecificRows(item) {
   const rowsByType = {
     subscription: [
-      ['Billing cycle', item.billingCycle],
+      ['Billing cycle', formatCycleLabel(item.billingCycle)],
       ['Renewal', formatOptionalDate(item.renewalDate)],
       ['Auto-renewal', item.autoRenewal],
       ['Cancel before', formatOptionalDate(item.cancelBeforeDate)],
     ],
     bill: [
       ['Due date', formatOptionalDate(item.dueDate)],
-      ['Frequency', item.frequency],
+      ['Frequency', formatCycleLabel(item.frequency)],
       ['Paid date', formatOptionalDate(item.paidDate)],
       ['Receipt', item.receiptName],
+    ],
+    insurance: [
+      ['Policy type', item.policyType],
+      ['Insurer', item.insurerName],
+      ['Policy number', item.policyNumber],
+      ['Premium', formatAmount(item.premiumAmount || item.amount)],
+      ['Due date', formatOptionalDate(item.dueDate)],
+      ['Frequency', formatCycleLabel(item.frequency)],
+      ['Paid date', formatOptionalDate(item.paidDate)],
     ],
     vendor: [
       ['Vendor', item.vendorName],

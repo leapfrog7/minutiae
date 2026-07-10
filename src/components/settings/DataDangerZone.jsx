@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   clearLifeItems,
-  resetSampleLifeItems,
+  loadDemoLifeItems,
 } from '../../features/lifeItems/lifeItemStorage'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionCard from '../common/SectionCard'
@@ -10,11 +10,11 @@ function DataDangerZone({ onDataChanged }) {
   const [confirmAction, setConfirmAction] = useState('')
   const [message, setMessage] = useState('')
 
-  function handleResetSamples() {
-    resetSampleLifeItems()
+  function handleLoadDemoData() {
+    loadDemoLifeItems()
     onDataChanged()
     setConfirmAction('')
-    setMessage('Sample household data restored.')
+    setMessage('Demo household data loaded.')
   }
 
   function handleClearAll() {
@@ -25,15 +25,18 @@ function DataDangerZone({ onDataChanged }) {
   }
 
   return (
-    <SectionCard title="Danger zone">
+    <SectionCard title="Local data actions">
       <div className="grid gap-2">
         <button
           type="button"
-          onClick={() => setConfirmAction('reset')}
+          onClick={() => setConfirmAction('demo')}
           className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-bold text-stone-800"
         >
-          Reset sample data
+          Load demo data
         </button>
+        <p className="px-1 text-xs leading-5 text-stone-500">
+          Use this only to preview how Minutiae looks with example household items.
+        </p>
         <button
           type="button"
           onClick={() => setConfirmAction('clear')}
@@ -48,14 +51,14 @@ function DataDangerZone({ onDataChanged }) {
         )}
       </div>
 
-      {confirmAction === 'reset' && (
+      {confirmAction === 'demo' && (
         <ConfirmDialog
-          title="Reset sample data?"
-          message="This will replace current data with demo household items."
-          confirmLabel="Reset"
+          title="Load demo data?"
+          message="This will replace your current local data with example household items."
+          confirmLabel="Load demo"
           tone="primary"
           onCancel={() => setConfirmAction('')}
-          onConfirm={handleResetSamples}
+          onConfirm={handleLoadDemoData}
         />
       )}
 

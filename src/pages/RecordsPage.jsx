@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import EmptyState from '../components/common/EmptyState'
 import ItemCard from '../components/common/ItemCard'
 import ItemDetailSheet from '../components/common/ItemDetailSheet'
 import SectionCard from '../components/common/SectionCard'
 import AppHeader from '../components/layout/AppHeader'
 import { getItemTypeMeta, itemTypes } from '../data/itemTypes'
 import { sortItemsByRelevantDate } from '../features/lifeItems/lifeItemHelpers'
-import {
-  getLifeItems,
-  seedLifeItemsIfEmpty,
-} from '../features/lifeItems/lifeItemStorage'
+import { getLifeItems } from '../features/lifeItems/lifeItemStorage'
 
 const searchableFields = [
   'title',
@@ -18,6 +16,9 @@ const searchableFields = [
   'complaintId',
   'companyOrDepartment',
   'documentType',
+  'insurerName',
+  'policyNumber',
+  'policyType',
 ]
 
 const filterOptions = [
@@ -25,19 +26,30 @@ const filterOptions = [
   { id: 'subscription', label: 'Subscriptions' },
   { id: 'bill', label: 'Bills' },
   { id: 'vendor', label: 'Vendors' },
+  { id: 'insurance', label: 'Insurance' },
   { id: 'complaint', label: 'Complaints' },
   { id: 'expense', label: 'Expenses' },
   { id: 'document', label: 'Documents' },
 ]
 
-function RecordsPage() {
+const groupTitles = {
+  bill: 'Bills',
+  complaint: 'Complaints',
+  document: 'Documents',
+  expense: 'Expenses',
+  insurance: 'Insurance',
+  subscription: 'Subscriptions',
+  vendor: 'Vendors',
+}
+
+function RecordsPage({ onNavigate }) {
   const [items, setItems] = useState([])
   const [query, setQuery] = useState('')
   const [selectedType, setSelectedType] = useState('all')
   const [selectedItem, setSelectedItem] = useState(null)
 
   useEffect(() => {
-    setItems(seedLifeItemsIfEmpty())
+    setItems(getLifeItems())
   }, [])
 
   function refreshItems(nextSelectedItem) {
@@ -74,67 +86,86 @@ function RecordsPage() {
       filteredItems.filter((item) => item.type === type.id),
     ),
   }))
+  const hasItems = items.length > 0
 
   return (
     <>
       <AppHeader
-        title="Records"
+        title="📄 Records"
         eyebrow="Searchable archive"
         description="Receipts, documents, complaint IDs, vendor details, and payment history in one place."
       />
 
-      <label className="mb-4 block">
-        <span className="sr-only">Search records</span>
-        <input
-          type="search"
-          placeholder="Search records"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm shadow-stone-200/50 outline-none placeholder:text-stone-400 focus:border-teal-300 focus:ring-4 focus:ring-teal-100"
-        />
-      </label>
-
-      <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
-        {filterOptions.map((option) => {
-          const isActive = option.id === selectedType
-
-          return (
+      {!hasItems ? (
+        <EmptyState
+          title="No records yet"
+          description="Your bills, subscriptions, vendors, complaints, documents, insurance and expenses will appear here once added."
+          cta={
             <button
-              key={option.id}
               type="button"
-              onClick={() => setSelectedType(option.id)}
-              className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold ${
-                isActive
-                  ? 'bg-teal-700 text-white'
-                  : 'bg-white text-stone-600 ring-1 ring-stone-200'
-              }`}
+              onClick={() => onNavigate('add')}
+              className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
             >
-              {option.label}
+              Add item
             </button>
-          )
-        })}
-      </div>
+          }
+        />
+      ) : (
+        <>
+          <label className="mb-5 block">
+            <span className="sr-only">Search records</span>
+            <input
+              type="search"
+              placeholder="Search records"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm shadow-stone-200/50 outline-none placeholder:text-stone-400 focus:border-teal-300 focus:ring-4 focus:ring-teal-100"
+            />
+          </label>
 
-      <div className="space-y-3">
-        {groupedItems.map((group) => (
-          <SectionCard
-            key={group.id}
-            title={`${group.emoji} ${group.label}s`}
-          >
-            <div className="space-y-2">
-              {group.items.length > 0 ? (
-                group.items.map((item) => (
-                  <ItemCard key={item.id} item={item} onOpen={setSelectedItem} />
-                ))
-              ) : (
-                <p className="rounded-xl bg-stone-50 px-3 py-3 text-sm text-stone-500">
-                  No matching records.
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        ))}
-      </div>
+          <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 py-1">
+            {filterOptions.map((option) => {
+              const isActive = option.id === selectedType
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setSelectedType(option.id)}
+                  className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold ${
+                    isActive
+                      ? 'bg-teal-700 text-white'
+                      : 'bg-white text-stone-600 ring-1 ring-stone-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="space-y-3">
+            {groupedItems.map((group) => (
+              <SectionCard
+                key={group.id}
+                title={`${group.emoji} ${groupTitles[group.id] ?? group.label}`}
+              >
+                <div className="space-y-2">
+                  {group.items.length > 0 ? (
+                    group.items.map((item) => (
+                      <ItemCard key={item.id} item={item} onOpen={setSelectedItem} />
+                    ))
+                  ) : (
+                    <p className="rounded-xl bg-stone-50 px-3 py-3 text-sm text-stone-500">
+                      No matching records.
+                    </p>
+                  )}
+                </div>
+              </SectionCard>
+            ))}
+          </div>
+        </>
+      )}
 
       <ItemDetailSheet
         item={selectedItem}

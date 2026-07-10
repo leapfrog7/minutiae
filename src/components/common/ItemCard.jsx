@@ -1,4 +1,4 @@
-import { statuses } from '../../data/lifeAdminConstants'
+import { getStatusMeta } from '../../data/lifeAdminConstants'
 import {
   formatAmount,
   formatDisplayDate,
@@ -8,11 +8,8 @@ import {
 } from '../../features/lifeItems/lifeItemHelpers'
 import StatusBadge from './StatusBadge'
 
-function ItemCard({ item, onOpen, showStatus = true }) {
-  const statusMeta = statuses.find((status) => status.id === item.status) ?? {
-    label: item.status,
-    tone: 'slate',
-  }
+function ItemCard({ dateLabel, framed = true, item, onOpen, showStatus = true }) {
+  const statusMeta = getStatusMeta(item.status)
   const relevantDate = getRelevantDate(item)
   const Wrapper = onOpen ? 'button' : 'article'
 
@@ -20,7 +17,11 @@ function ItemCard({ item, onOpen, showStatus = true }) {
     <Wrapper
       type={onOpen ? 'button' : undefined}
       onClick={onOpen ? () => onOpen(item) : undefined}
-      className="flex w-full items-start gap-3 rounded-xl border border-stone-200 bg-white px-3 py-3 text-left shadow-sm shadow-stone-200/40 transition hover:border-teal-200 hover:bg-teal-50/30"
+      className={`flex w-full items-start gap-3 rounded-xl bg-white px-3 py-3 text-left transition hover:bg-teal-50/30 ${
+        framed
+          ? 'border border-stone-200 shadow-sm shadow-stone-200/40'
+          : ''
+      }`}
     >
       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-lg">
         {getItemEmoji(item)}
@@ -28,15 +29,15 @@ function ItemCard({ item, onOpen, showStatus = true }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-stone-950">
+            <p className="line-clamp-2 break-words text-sm font-semibold text-stone-950">
               {item.title}
             </p>
             <p className="mt-0.5 text-xs text-stone-500">
-              {getItemTypeLabel(item.type)} · {formatDisplayDate(relevantDate)}
+              {getItemTypeLabel(item.type)} - {dateLabel || formatDisplayDate(relevantDate)}
             </p>
           </div>
           {item.amount > 0 && (
-            <p className="shrink-0 text-sm font-semibold text-stone-900">
+            <p className="max-w-[38%] shrink-0 break-words text-right text-sm font-semibold text-stone-900">
               {formatAmount(item.amount)}
             </p>
           )}
@@ -46,7 +47,7 @@ function ItemCard({ item, onOpen, showStatus = true }) {
           item.category ||
           item.complaintId ||
           item.notes) && (
-          <p className="mt-1 truncate text-xs text-stone-500">
+          <p className="mt-1 line-clamp-1 break-words text-xs text-stone-500">
             {item.vendorName ||
               item.companyOrDepartment ||
               item.complaintId ||

@@ -1,6 +1,10 @@
-import ItemCard from '../common/ItemCard'
+import {
+  formatRelativeDueLabel,
+  getRelevantDate,
+} from '../../features/lifeItems/lifeItemHelpers'
+import ActionItemCard from '../common/ActionItemCard'
 
-function AgendaGroup({ items, label, onOpenItem }) {
+function AgendaGroup({ items, label, onOpenItem, onQuickAction }) {
   if (items.length === 0) {
     return null
   }
@@ -12,7 +16,13 @@ function AgendaGroup({ items, label, onOpenItem }) {
       </h2>
       <div className="space-y-2">
         {items.map((item) => (
-          <ItemCard key={item.id} item={item} onOpen={onOpenItem} />
+          <ActionItemCard
+            key={item.id}
+            item={item}
+            dateLabel={formatRelativeDueLabel(getRelevantDate(item))}
+            onOpen={onOpenItem}
+            onQuickAction={onQuickAction}
+          />
         ))}
       </div>
     </section>

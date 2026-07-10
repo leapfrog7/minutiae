@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AddItemForm from '../components/add/AddItemForm'
 import AddItemTypeSelector from '../components/add/AddItemTypeSelector'
 import SectionCard from '../components/common/SectionCard'
@@ -7,9 +7,16 @@ import { itemTypes } from '../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../data/itemTypes'
 import { addLifeItem } from '../features/lifeItems/lifeItemStorage'
 
-function AddPage({ onNavigate }) {
-  const [selectedType, setSelectedType] = useState('')
+function AddPage({ initialType = '', onNavigate }) {
+  const [selectedType, setSelectedType] = useState(initialType)
   const [savedItem, setSavedItem] = useState(null)
+
+  useEffect(() => {
+    if (initialType) {
+      setSavedItem(null)
+      setSelectedType(initialType)
+    }
+  }, [initialType])
 
   function handleSave(item) {
     setSavedItem(addLifeItem(item))

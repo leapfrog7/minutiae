@@ -10,7 +10,6 @@ import {
 } from '../features/lifeItems/lifeItemHelpers'
 import {
   getLifeItems,
-  seedLifeItemsIfEmpty,
 } from '../features/lifeItems/lifeItemStorage'
 
 const statLabels = [
@@ -18,6 +17,7 @@ const statLabels = [
   ['subscription', 'Subscriptions'],
   ['bill', 'Bills'],
   ['vendor', 'Vendors'],
+  ['insurance', 'Insurance'],
   ['complaint', 'Complaints'],
   ['expense', 'Expenses'],
   ['document', 'Documents'],
@@ -28,7 +28,7 @@ function SettingsPage({ onNavigate }) {
   const [items, setItems] = useState([])
 
   useEffect(() => {
-    setItems(seedLifeItemsIfEmpty())
+    setItems(getLifeItems())
   }, [])
 
   function refreshItems() {
@@ -45,7 +45,7 @@ function SettingsPage({ onNavigate }) {
           onClick={() => onNavigate('home')}
           className="mb-3 rounded-full bg-white px-3 py-2 text-xs font-bold text-stone-700 ring-1 ring-stone-200"
         >
-          ← Back
+          Back
         </button>
         <p className="text-sm font-semibold text-teal-700">
           Local data settings
@@ -58,22 +58,32 @@ function SettingsPage({ onNavigate }) {
         <InstallPrompt />
 
         <SectionCard title="Data summary">
-          <div className="grid grid-cols-2 gap-2">
-            {statLabels.map(([key, label]) => (
-              <div key={key} className="rounded-xl bg-stone-50 px-3 py-2">
-                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500">
-                  {label}
-                </p>
-                <p className="mt-1 text-lg font-bold text-stone-950">
-                  {stats[key] || 0}
-                </p>
+          {items.length === 0 ? (
+            <p className="rounded-xl bg-stone-50 px-3 py-3 text-sm font-semibold text-stone-600">
+              No local items stored yet.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {statLabels.map(([key, label]) => (
+                  <div key={key} className="rounded-xl bg-stone-50 px-3 py-2">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-stone-500">
+                      {label}
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-stone-950">
+                      {stats[key] || 0}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <p className="mt-2 rounded-xl bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-600">
-            Last updated:{' '}
-            {stats.lastUpdated ? formatDisplayDate(stats.lastUpdated.slice(0, 10)) : 'No saved items'}
-          </p>
+              <p className="mt-2 rounded-xl bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-600">
+                Last updated:{' '}
+                {stats.lastUpdated
+                  ? formatDisplayDate(stats.lastUpdated.slice(0, 10))
+                  : 'No saved items'}
+              </p>
+            </>
+          )}
         </SectionCard>
 
         <BackupRestore onDataChanged={refreshItems} />

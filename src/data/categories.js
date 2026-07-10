@@ -16,6 +16,7 @@ export const indiaFirstCategories = [
   'Car Cleaner',
   'Tutor',
   'Grocery',
+  'Eating Out / Restaurant',
   'Medical',
   'Fuel',
   'Shopping',

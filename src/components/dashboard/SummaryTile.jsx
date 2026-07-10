@@ -1,8 +1,8 @@
-import { statuses } from '../../data/lifeAdminConstants'
+import { getStatusMeta } from '../../data/lifeAdminConstants'
 import StatusBadge from '../common/StatusBadge'
 
 function SummaryTile({ detail, status, title, value }) {
-  const statusMeta = statuses.find((item) => item.id === status)
+  const statusMeta = status ? getStatusMeta(status) : null
 
   return (
     <article className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/60">

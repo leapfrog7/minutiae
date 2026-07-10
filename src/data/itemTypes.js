@@ -18,6 +18,12 @@ export const itemTypes = [
     description: 'Household helpers, society vendors, tutors, and local services.',
   },
   {
+    id: 'insurance',
+    label: 'Insurance',
+    emoji: '🛡️',
+    description: 'Premiums, policies, renewal dates, and insurer details.',
+  },
+  {
     id: 'complaint',
     label: 'Complaint / Service Request',
     emoji: '🛠️',

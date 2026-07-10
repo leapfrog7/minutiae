@@ -12,7 +12,12 @@ function ConfirmDialog({
       : 'bg-teal-700 text-white'
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-stone-950/40 px-4">
+    <div
+      className="fixed inset-0 z-30 flex items-center justify-center bg-stone-950/40 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
       <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20">
         <h2 className="text-base font-bold text-stone-950">{title}</h2>
         <p className="mt-2 text-sm text-stone-600">{message}</p>

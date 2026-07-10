@@ -41,10 +41,10 @@ const createSampleLifeItems = () => {
         amount: 1999,
         dueDate: addDays(3),
         renewalDate: addDays(3),
-        status: 'due-soon',
+        status: 'pending',
         paymentMode: 'Card',
         category: 'Subscription',
-        billingCycle: 'Monthly',
+        billingCycle: 'monthly',
         autoRenewal: true,
         cancelBeforeDate: addDays(1),
         notes: 'Personal productivity subscription.',
@@ -59,10 +59,10 @@ const createSampleLifeItems = () => {
         amount: 299,
         dueDate: addDays(18),
         renewalDate: addDays(18),
-        status: 'due-soon',
+        status: 'pending',
         paymentMode: 'Auto Debit',
         category: 'Subscription',
-        billingCycle: 'Monthly',
+        billingCycle: 'quarterly',
         autoRenewal: true,
         notes: 'Family plan renewal.',
       },
@@ -79,7 +79,7 @@ const createSampleLifeItems = () => {
         status: 'paid',
         paymentMode: 'Card',
         category: 'Subscription',
-        billingCycle: 'Yearly',
+        billingCycle: 'yearly',
         autoRenewal: true,
         notes: 'Annual storage plan.',
       },
@@ -95,7 +95,7 @@ const createSampleLifeItems = () => {
         status: 'overdue',
         paymentMode: 'UPI',
         category: 'Electricity',
-        frequency: 'Monthly',
+        frequency: 'monthly',
         receiptName: '',
         notes: 'Check meter reading before paying.',
       },
@@ -108,10 +108,10 @@ const createSampleLifeItems = () => {
         title: 'IGL gas bill',
         amount: 760,
         dueDate: addDays(5),
-        status: 'due-soon',
+        status: 'unpaid',
         paymentMode: 'UPI',
         category: 'IGL / Gas',
-        frequency: 'Bi-monthly',
+        frequency: 'monthly',
         notes: 'Pay after salary credit.',
       },
       now,
@@ -127,8 +127,27 @@ const createSampleLifeItems = () => {
         status: 'paid',
         paymentMode: 'Bank Transfer',
         category: 'Society Maintenance',
-        frequency: 'Monthly',
+        frequency: 'monthly',
         receiptName: 'maintenance-july.pdf',
+      },
+      now,
+    ),
+    withTimestamps(
+      {
+        id: 'sample-health-insurance',
+        type: 'insurance',
+        title: 'Family health insurance',
+        amount: 18500,
+        premiumAmount: 18500,
+        dueDate: addDays(12),
+        status: 'unpaid',
+        paymentMode: 'UPI',
+        category: 'Insurance',
+        policyType: 'Health',
+        insurerName: 'HDFC Ergo',
+        policyNumber: 'HEALTH-28491',
+        frequency: 'yearly',
+        notes: 'Renew before grace period starts.',
       },
       now,
     ),
@@ -140,7 +159,7 @@ const createSampleLifeItems = () => {
         amount: 4500,
         dueDate: addDays(0),
         paymentDate: addDays(0),
-        status: 'due-soon',
+        status: 'unpaid',
         paymentMode: 'UPI',
         category: 'Maid',
         vendorName: 'Sunita',
@@ -160,7 +179,7 @@ const createSampleLifeItems = () => {
         amount: 620,
         dueDate: addDays(1),
         paymentDate: addDays(1),
-        status: 'due-soon',
+        status: 'unpaid',
         paymentMode: 'Cash',
         category: 'Ironing',
         vendorName: 'Ramesh Presswala',
@@ -211,7 +230,7 @@ const createSampleLifeItems = () => {
         type: 'complaint',
         title: 'Amazon return pickup',
         amount: 1299,
-        status: 'follow-up',
+        status: 'followed_up',
         category: 'Complaint',
         complaintId: 'AMZ-RTRN-7731',
         companyOrDepartment: 'Amazon',
@@ -322,21 +341,6 @@ export function clearLifeItems() {
   saveLifeItems([])
 }
 
-export function seedLifeItemsIfEmpty() {
-  if (localStorage.getItem(STORAGE_KEY) !== null) {
-    return getLifeItems()
-  }
-
-  const currentItems = getLifeItems()
-
-  if (currentItems.length > 0) {
-    return currentItems
-  }
-
+export function loadDemoLifeItems() {
   return saveLifeItems(createSampleLifeItems())
-}
-
-export function resetSampleLifeItems() {
-  localStorage.removeItem(STORAGE_KEY)
-  return seedLifeItemsIfEmpty()
 }
