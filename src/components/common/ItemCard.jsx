@@ -1,11 +1,14 @@
 import { statuses } from '../../data/lifeAdminConstants'
-import { getItemTypeMeta } from '../../data/itemTypes'
-import { formatCurrency, formatDate } from '../../features/lifeItems/lifeItemFormatters'
-import { getRelevantDate } from '../../features/lifeItems/lifeItemHelpers'
+import {
+  formatAmount,
+  formatDisplayDate,
+  getItemEmoji,
+  getItemTypeLabel,
+  getRelevantDate,
+} from '../../features/lifeItems/lifeItemHelpers'
 import StatusBadge from './StatusBadge'
 
 function ItemCard({ item, onOpen, showStatus = true }) {
-  const typeMeta = getItemTypeMeta(item.type)
   const statusMeta = statuses.find((status) => status.id === item.status) ?? {
     label: item.status,
     tone: 'slate',
@@ -20,7 +23,7 @@ function ItemCard({ item, onOpen, showStatus = true }) {
       className="flex w-full items-start gap-3 rounded-xl border border-stone-200 bg-white px-3 py-3 text-left shadow-sm shadow-stone-200/40 transition hover:border-teal-200 hover:bg-teal-50/30"
     >
       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-lg">
-        {typeMeta.emoji}
+        {getItemEmoji(item)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
@@ -29,22 +32,33 @@ function ItemCard({ item, onOpen, showStatus = true }) {
               {item.title}
             </p>
             <p className="mt-0.5 text-xs text-stone-500">
-              {typeMeta.label} · {formatDate(relevantDate)}
+              {getItemTypeLabel(item.type)} · {formatDisplayDate(relevantDate)}
             </p>
           </div>
           {item.amount > 0 && (
             <p className="shrink-0 text-sm font-semibold text-stone-900">
-              {formatCurrency(item.amount)}
+              {formatAmount(item.amount)}
             </p>
           )}
         </div>
-        {(item.category || item.notes || item.complaintId) && (
+        {(item.vendorName ||
+          item.companyOrDepartment ||
+          item.category ||
+          item.complaintId ||
+          item.notes) && (
           <p className="mt-1 truncate text-xs text-stone-500">
-            {item.complaintId || item.category || item.notes}
+            {item.vendorName ||
+              item.companyOrDepartment ||
+              item.complaintId ||
+              item.category ||
+              item.notes}
           </p>
         )}
         {showStatus && item.status && (
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
+              {getItemTypeLabel(item.type)}
+            </span>
             <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
           </div>
         )}

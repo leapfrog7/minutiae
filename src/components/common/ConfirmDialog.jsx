@@ -1,4 +1,16 @@
-function ConfirmDialog({ message, onCancel, onConfirm, title }) {
+function ConfirmDialog({
+  confirmLabel = 'Delete',
+  message,
+  onCancel,
+  onConfirm,
+  title,
+  tone = 'danger',
+}) {
+  const confirmClass =
+    tone === 'danger'
+      ? 'bg-rose-600 text-white'
+      : 'bg-teal-700 text-white'
+
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-stone-950/40 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20">
@@ -15,9 +27,9 @@ function ConfirmDialog({ message, onCancel, onConfirm, title }) {
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-bold text-white"
+            className={`rounded-2xl px-4 py-3 text-sm font-bold ${confirmClass}`}
           >
-            Delete
+            {confirmLabel}
           </button>
         </div>
       </div>

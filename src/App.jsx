@@ -5,6 +5,7 @@ import CalendarPage from './pages/CalendarPage'
 import HomePage from './pages/HomePage'
 import MoneyPage from './pages/MoneyPage'
 import RecordsPage from './pages/RecordsPage'
+import SettingsPage from './pages/SettingsPage'
 
 const pages = {
   home: HomePage,
@@ -12,6 +13,7 @@ const pages = {
   calendar: CalendarPage,
   money: MoneyPage,
   records: RecordsPage,
+  settings: SettingsPage,
 }
 
 function App() {

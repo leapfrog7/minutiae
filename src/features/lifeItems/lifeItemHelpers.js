@@ -1,3 +1,5 @@
+import { getItemTypeMeta } from '../../data/itemTypes'
+
 const inactiveStatuses = new Set(['paid', 'archived', 'resolved', 'closed'])
 
 const toDate = (value) => {
@@ -28,6 +30,78 @@ export function isCompletedItem(item) {
 }
 
 const isActive = (item) => !isCompletedItem(item)
+
+export function formatAmount(value) {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+
+  return new Intl.NumberFormat('en-IN', {
+    currency: 'INR',
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(value)
+}
+
+export function formatDisplayDate(dateString) {
+  if (!dateString) {
+    return 'No date'
+  }
+
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(`${dateString}T00:00:00`))
+}
+
+export function getItemEmoji(itemOrType) {
+  const type = typeof itemOrType === 'string' ? itemOrType : itemOrType?.type
+  return getItemTypeMeta(type).emoji
+}
+
+export function getItemTypeLabel(type) {
+  return getItemTypeMeta(type).label
+}
+
+export function getLifeItemStats(items) {
+  const counts = items.reduce(
+    (summary, item) => {
+      summary.total += 1
+      summary[item.type] = (summary[item.type] || 0) + 1
+
+      if (!isCompletedItem(item)) {
+        summary.actionable += 1
+      }
+
+      if (item.updatedAt) {
+        const updatedTime = new Date(item.updatedAt).getTime()
+
+        if (!summary.lastUpdatedTime || updatedTime > summary.lastUpdatedTime) {
+          summary.lastUpdatedTime = updatedTime
+          summary.lastUpdated = item.updatedAt
+        }
+      }
+
+      return summary
+    },
+    {
+      actionable: 0,
+      bill: 0,
+      complaint: 0,
+      document: 0,
+      expense: 0,
+      lastUpdated: '',
+      lastUpdatedTime: 0,
+      subscription: 0,
+      total: 0,
+      vendor: 0,
+    },
+  )
+
+  delete counts.lastUpdatedTime
+  return counts
+}
 
 export function getRelevantDate(item) {
   if (item.type === 'subscription') {

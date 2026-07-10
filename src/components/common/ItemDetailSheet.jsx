@@ -2,8 +2,11 @@ import { useState } from 'react'
 import AddItemForm from '../add/AddItemForm'
 import { statuses } from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
-import { formatCurrency, formatDate } from '../../features/lifeItems/lifeItemFormatters'
-import { getRelevantDate } from '../../features/lifeItems/lifeItemHelpers'
+import {
+  formatAmount,
+  formatDisplayDate,
+  getRelevantDate,
+} from '../../features/lifeItems/lifeItemHelpers'
 import {
   deleteLifeItem,
   updateLifeItem,
@@ -95,14 +98,14 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
               )}
               {item.amount > 0 && (
                 <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-stone-900 ring-1 ring-stone-200">
-                  {formatCurrency(item.amount)}
+                  {formatAmount(item.amount)}
                 </span>
               )}
             </div>
 
             <div className="mt-4 grid gap-2">
               <DetailRow label="Type" value={typeMeta.label} />
-              <DetailRow label="Relevant date" value={formatDate(getRelevantDate(item))} />
+              <DetailRow label="Relevant date" value={formatDisplayDate(getRelevantDate(item))} />
               <DetailRow label="Category" value={item.category} />
               <DetailRow label="Payment" value={item.paymentMode} />
               <DetailRow label="Notes" value={item.notes} />
@@ -181,8 +184,11 @@ function getQuickAction(item) {
     return { label: 'Mark Paid', status: 'paid' }
   }
 
-  if (item.type === 'subscription' && item.status === 'pending') {
-    return { label: 'Mark Renewed', status: 'paid' }
+  if (
+    item.type === 'subscription' &&
+    ['pending', 'unpaid'].includes(item.status)
+  ) {
+    return { label: 'Mark Paid', status: 'paid' }
   }
 
   if (
@@ -219,8 +225,8 @@ function getSpecificRows(item) {
       ['Phone', item.contactNumber],
       ['UPI ID', item.upiId],
       ['Payment date', formatOptionalDate(item.paymentDate)],
-      ['Advance', formatCurrency(item.advanceGiven)],
-      ['Balance', formatCurrency(item.balancePayable)],
+      ['Advance', formatAmount(item.advanceGiven)],
+      ['Balance', formatAmount(item.balancePayable)],
     ],
     complaint: [
       ['Complaint ID', item.complaintId],
@@ -246,7 +252,7 @@ function getSpecificRows(item) {
 }
 
 function formatOptionalDate(value) {
-  return value ? formatDate(value) : ''
+  return value ? formatDisplayDate(value) : ''
 }
 
 export default ItemDetailSheet

@@ -19,7 +19,7 @@ import {
 
 const previewLimit = 3
 
-function HomePage() {
+function HomePage({ onNavigate }) {
   const [items, setItems] = useState([])
   const [selectedItem, setSelectedItem] = useState(null)
 
@@ -53,6 +53,7 @@ function HomePage() {
   const settingsAction = (
     <button
       type="button"
+      onClick={() => onNavigate('settings')}
       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-600 shadow-sm shadow-stone-200/70"
       aria-label="Open settings"
     >

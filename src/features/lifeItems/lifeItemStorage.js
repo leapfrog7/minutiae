@@ -319,10 +319,14 @@ export function deleteLifeItem(id) {
 }
 
 export function clearLifeItems() {
-  localStorage.removeItem(STORAGE_KEY)
+  saveLifeItems([])
 }
 
 export function seedLifeItemsIfEmpty() {
+  if (localStorage.getItem(STORAGE_KEY) !== null) {
+    return getLifeItems()
+  }
+
   const currentItems = getLifeItems()
 
   if (currentItems.length > 0) {
@@ -330,4 +334,9 @@ export function seedLifeItemsIfEmpty() {
   }
 
   return saveLifeItems(createSampleLifeItems())
+}
+
+export function resetSampleLifeItems() {
+  localStorage.removeItem(STORAGE_KEY)
+  return seedLifeItemsIfEmpty()
 }

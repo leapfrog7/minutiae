@@ -20,9 +20,20 @@ const searchableFields = [
   'documentType',
 ]
 
+const filterOptions = [
+  { id: 'all', label: 'All' },
+  { id: 'subscription', label: 'Subscriptions' },
+  { id: 'bill', label: 'Bills' },
+  { id: 'vendor', label: 'Vendors' },
+  { id: 'complaint', label: 'Complaints' },
+  { id: 'expense', label: 'Expenses' },
+  { id: 'document', label: 'Documents' },
+]
+
 function RecordsPage() {
   const [items, setItems] = useState([])
   const [query, setQuery] = useState('')
+  const [selectedType, setSelectedType] = useState('all')
   const [selectedItem, setSelectedItem] = useState(null)
 
   useEffect(() => {
@@ -36,19 +47,28 @@ function RecordsPage() {
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
+    const typeFilteredItems =
+      selectedType === 'all'
+        ? items
+        : items.filter((item) => item.type === selectedType)
 
     if (!normalizedQuery) {
-      return items
+      return typeFilteredItems
     }
 
-    return items.filter((item) =>
+    return typeFilteredItems.filter((item) =>
       searchableFields.some((field) =>
         String(item[field] || '').toLowerCase().includes(normalizedQuery),
       ),
     )
-  }, [items, query])
+  }, [items, query, selectedType])
 
-  const groupedItems = itemTypes.map((type) => ({
+  const visibleTypes =
+    selectedType === 'all'
+      ? itemTypes
+      : itemTypes.filter((type) => type.id === selectedType)
+
+  const groupedItems = visibleTypes.map((type) => ({
     ...getItemTypeMeta(type.id),
     items: sortItemsByRelevantDate(
       filteredItems.filter((item) => item.type === type.id),
@@ -73,6 +93,27 @@ function RecordsPage() {
           className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm shadow-stone-200/50 outline-none placeholder:text-stone-400 focus:border-teal-300 focus:ring-4 focus:ring-teal-100"
         />
       </label>
+
+      <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
+        {filterOptions.map((option) => {
+          const isActive = option.id === selectedType
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setSelectedType(option.id)}
+              className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold ${
+                isActive
+                  ? 'bg-teal-700 text-white'
+                  : 'bg-white text-stone-600 ring-1 ring-stone-200'
+              }`}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
 
       <div className="space-y-3">
         {groupedItems.map((group) => (
