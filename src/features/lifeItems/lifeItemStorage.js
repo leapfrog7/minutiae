@@ -1,3 +1,8 @@
+import {
+  createExpenseFromPaidItem,
+  getDateInputValue,
+} from './lifeItemHelpers'
+
 const STORAGE_KEY = 'minutiae-life-items'
 
 const toDateInput = (date) => date.toISOString().slice(0, 10)
@@ -329,6 +334,44 @@ export function updateLifeItem(id, updates) {
 
   saveLifeItems(nextItems)
   return nextItems.find((item) => item.id === id)
+}
+
+export function markLifeItemPaid(item, { recordExpense = false } = {}) {
+  const timestamp = new Date().toISOString()
+  const paidDate = getDateInputValue()
+  const currentItems = getLifeItems()
+  const hasLinkedExpense = currentItems.some(
+    (currentItem) =>
+      currentItem.type === 'expense' && currentItem.linkedItemId === item.id,
+  )
+  const expenseDraft =
+    recordExpense && !hasLinkedExpense ? createExpenseFromPaidItem(item) : null
+  const expenseItem = expenseDraft
+    ? withTimestamps(expenseDraft, timestamp)
+    : null
+  let updatedItem = null
+  const nextItems = currentItems.map((currentItem) => {
+    if (currentItem.id !== item.id) {
+      return currentItem
+    }
+
+    updatedItem = {
+      ...currentItem,
+      status: 'paid',
+      paidDate,
+      updatedAt: timestamp,
+    }
+    return updatedItem
+  })
+
+  saveLifeItems(expenseItem ? [expenseItem, ...nextItems] : nextItems)
+
+  return {
+    duplicateSkipped: recordExpense && hasLinkedExpense,
+    expenseCreated: Boolean(expenseItem),
+    expenseItem,
+    updatedItem,
+  }
 }
 
 export function deleteLifeItem(id) {

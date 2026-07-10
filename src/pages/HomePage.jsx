@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import ActionItemCard from '../components/common/ActionItemCard'
 import EmptyState from '../components/common/EmptyState'
 import ItemDetailSheet from '../components/common/ItemDetailSheet'
+import MarkPaidDialog from '../components/common/MarkPaidDialog'
 import SectionCard from '../components/common/SectionCard'
 import SummaryTile from '../components/dashboard/SummaryTile'
 import AppHeader from '../components/layout/AppHeader'
 import {
   formatAmount,
   formatRelativeDueLabel,
+  canRecordPaymentAsExpense,
   getCurrentMonthKey,
   getMonthlyExpenseTotal,
   getPriorityItems,
@@ -18,13 +20,13 @@ import {
 } from '../features/lifeItems/lifeItemHelpers'
 import {
   getLifeItems,
+  markLifeItemPaid,
   updateLifeItem,
 } from '../features/lifeItems/lifeItemStorage'
 
-const today = () => new Date().toISOString().slice(0, 10)
-
 function HomePage({ onNavigate }) {
   const [items, setItems] = useState([])
+  const [pendingPaidItem, setPendingPaidItem] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
 
   useEffect(() => {
@@ -43,13 +45,18 @@ function HomePage({ onNavigate }) {
       return
     }
 
-    const updates = { status: quickAction.status }
-
-    if (['bill', 'vendor', 'subscription', 'insurance'].includes(item.type)) {
-      updates.paidDate = today()
+    if (quickAction.status === 'paid' && canRecordPaymentAsExpense(item)) {
+      setPendingPaidItem(item)
+      return
     }
 
-    updateLifeItem(item.id, updates)
+    updateLifeItem(item.id, { status: quickAction.status })
+    refreshItems(null)
+  }
+
+  function handleConfirmPaid({ recordExpense }) {
+    markLifeItemPaid(pendingPaidItem, { recordExpense })
+    setPendingPaidItem(null)
     refreshItems(null)
   }
 
@@ -160,7 +167,21 @@ function HomePage({ onNavigate }) {
         onItemDeleted={() => refreshItems(null)}
         onItemUpdated={refreshItems}
       />
+
+      {pendingPaidItem && (
+        <MarkPaidDialog
+          duplicateExpense={hasLinkedExpense(items, pendingPaidItem.id)}
+          onCancel={() => setPendingPaidItem(null)}
+          onConfirm={handleConfirmPaid}
+        />
+      )}
     </>
+  )
+}
+
+function hasLinkedExpense(items, itemId) {
+  return items.some(
+    (item) => item.type === 'expense' && item.linkedItemId === itemId,
   )
 }
 

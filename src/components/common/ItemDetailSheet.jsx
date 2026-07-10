@@ -3,6 +3,7 @@ import AddItemForm from '../add/AddItemForm'
 import { getStatusMeta } from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
 import {
+  canRecordPaymentAsExpense,
   formatAmount,
   formatCycleLabel,
   formatDisplayDate,
@@ -11,15 +12,17 @@ import {
 } from '../../features/lifeItems/lifeItemHelpers'
 import {
   deleteLifeItem,
+  getLifeItems,
+  markLifeItemPaid,
   updateLifeItem,
 } from '../../features/lifeItems/lifeItemStorage'
 import ConfirmDialog from './ConfirmDialog'
+import MarkPaidDialog from './MarkPaidDialog'
 import StatusBadge from './StatusBadge'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   const [isEditing, setIsEditing] = useState(false)
+  const [showPaidConfirm, setShowPaidConfirm] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
   if (!item) {
@@ -35,14 +38,19 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
       return
     }
 
-    const updates = { status: quickAction.status }
-
-    if (['bill', 'vendor', 'subscription', 'insurance'].includes(item.type)) {
-      updates.paidDate = today()
+    if (quickAction.status === 'paid' && canRecordPaymentAsExpense(item)) {
+      setShowPaidConfirm(true)
+      return
     }
 
-    const updatedItem = updateLifeItem(item.id, updates)
+    const updatedItem = updateLifeItem(item.id, { status: quickAction.status })
     onItemUpdated(updatedItem)
+  }
+
+  function handleConfirmPaid({ recordExpense }) {
+    const result = markLifeItemPaid(item, { recordExpense })
+    setShowPaidConfirm(false)
+    onItemUpdated(result.updatedItem)
   }
 
   function handleEditSave(updates) {
@@ -156,7 +164,21 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
           onConfirm={handleDelete}
         />
       )}
+
+      {showPaidConfirm && (
+        <MarkPaidDialog
+          duplicateExpense={hasLinkedExpense(item.id)}
+          onCancel={() => setShowPaidConfirm(false)}
+          onConfirm={handleConfirmPaid}
+        />
+      )}
     </>
+  )
+}
+
+function hasLinkedExpense(itemId) {
+  return getLifeItems().some(
+    (item) => item.type === 'expense' && item.linkedItemId === itemId,
   )
 }
 

@@ -2,18 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import AgendaGroup from '../components/calendar/AgendaGroup'
 import EmptyState from '../components/common/EmptyState'
 import ItemDetailSheet from '../components/common/ItemDetailSheet'
+import MarkPaidDialog from '../components/common/MarkPaidDialog'
 import AppHeader from '../components/layout/AppHeader'
 import {
+  canRecordPaymentAsExpense,
   getCalendarItems,
   getQuickStatusAction,
   groupAgendaItems,
 } from '../features/lifeItems/lifeItemHelpers'
 import {
   getLifeItems,
+  markLifeItemPaid,
   updateLifeItem,
 } from '../features/lifeItems/lifeItemStorage'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 const filterOptions = [
   { id: 'all', label: 'All' },
@@ -27,6 +28,7 @@ const filterOptions = [
 
 function CalendarPage({ onNavigate }) {
   const [items, setItems] = useState([])
+  const [pendingPaidItem, setPendingPaidItem] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
   const [selectedType, setSelectedType] = useState('all')
 
@@ -46,13 +48,18 @@ function CalendarPage({ onNavigate }) {
       return
     }
 
-    const updates = { status: quickAction.status }
-
-    if (['bill', 'vendor', 'subscription', 'insurance'].includes(item.type)) {
-      updates.paidDate = today()
+    if (quickAction.status === 'paid' && canRecordPaymentAsExpense(item)) {
+      setPendingPaidItem(item)
+      return
     }
 
-    updateLifeItem(item.id, updates)
+    updateLifeItem(item.id, { status: quickAction.status })
+    refreshItems(null)
+  }
+
+  function handleConfirmPaid({ recordExpense }) {
+    markLifeItemPaid(pendingPaidItem, { recordExpense })
+    setPendingPaidItem(null)
     refreshItems(null)
   }
 
@@ -136,7 +143,21 @@ function CalendarPage({ onNavigate }) {
         onItemDeleted={() => refreshItems(null)}
         onItemUpdated={refreshItems}
       />
+
+      {pendingPaidItem && (
+        <MarkPaidDialog
+          duplicateExpense={hasLinkedExpense(items, pendingPaidItem.id)}
+          onCancel={() => setPendingPaidItem(null)}
+          onConfirm={handleConfirmPaid}
+        />
+      )}
     </>
+  )
+}
+
+function hasLinkedExpense(items, itemId) {
+  return items.some(
+    (item) => item.type === 'expense' && item.linkedItemId === itemId,
   )
 }
 

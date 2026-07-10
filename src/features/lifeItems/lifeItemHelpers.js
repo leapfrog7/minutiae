@@ -1,6 +1,7 @@
 import { getItemTypeMeta } from '../../data/itemTypes'
 
 const inactiveStatuses = new Set(['paid', 'archived', 'resolved', 'closed'])
+const expenseRecordableTypes = new Set(['subscription', 'bill', 'vendor', 'insurance'])
 
 const toDate = (value) => {
   if (!value) {
@@ -250,6 +251,45 @@ export function getQuickStatusAction(item) {
   }
 
   return null
+}
+
+export function canRecordPaymentAsExpense(item) {
+  return expenseRecordableTypes.has(item.type)
+}
+
+export function createExpenseFromPaidItem(item) {
+  if (!canRecordPaymentAsExpense(item)) {
+    return null
+  }
+
+  const title = item.type === 'vendor' ? item.vendorName || item.title : item.title
+  const amountByType = {
+    insurance: item.premiumAmount || item.amount,
+    vendor: item.monthlyAmount || item.amount,
+  }
+  const categoryByType = {
+    bill: item.category || 'Bills',
+    insurance: 'Insurance',
+    subscription: 'Subscription',
+    vendor: item.serviceType || 'Local Vendors',
+  }
+
+  return {
+    type: 'expense',
+    title,
+    amount: Number(amountByType[item.type] || item.amount || 0),
+    date: getDateInputValue(),
+    category: categoryByType[item.type],
+    paymentMode: item.paymentMode || '',
+    recurring: true,
+    notes: `Recorded from paid ${item.type}: ${title}`,
+    linkedItemId: item.id,
+    status: 'paid',
+  }
+}
+
+export function getDateInputValue(date = new Date()) {
+  return date.toISOString().slice(0, 10)
 }
 
 export function getActionPriority(item) {
