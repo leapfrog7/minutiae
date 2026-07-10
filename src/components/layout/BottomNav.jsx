@@ -49,10 +49,15 @@ function BottomNav({ activePage, onNavigate }) {
               aria-current={isActive ? 'page' : undefined}
               aria-label={item.label}
             >
-              <span className="text-lg leading-none" aria-hidden="true">
+              <span
+                className={`flex h-5 items-center justify-center leading-none ${
+                  item.id === 'add' ? 'text-lg font-bold' : 'text-lg'
+                }`}
+                aria-hidden="true"
+              >
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span className="h-3 leading-3">{item.label}</span>
             </button>
           )
         })}

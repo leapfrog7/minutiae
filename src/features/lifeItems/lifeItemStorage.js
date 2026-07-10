@@ -1,6 +1,7 @@
 import {
-  createExpenseFromPaidItem,
+  createExpenseFromSourceItem,
   getDateInputValue,
+  hasLinkedExpense,
 } from './lifeItemHelpers'
 
 const STORAGE_KEY = 'minutiae-life-items'
@@ -264,6 +265,40 @@ const createSampleLifeItems = () => {
     ),
     withTimestamps(
       {
+        id: 'sample-salary',
+        type: 'income',
+        title: 'Salary',
+        amount: 125000,
+        date: addDays(-6),
+        status: 'received',
+        paymentMode: 'Bank Transfer',
+        category: 'Salary',
+        sourceName: 'Employer',
+        recurring: true,
+        frequency: 'monthly',
+        notes: 'Monthly salary credit.',
+      },
+      now,
+    ),
+    withTimestamps(
+      {
+        id: 'sample-bank-interest',
+        type: 'income',
+        title: 'Bank interest',
+        amount: 850,
+        date: addDays(-9),
+        status: 'received',
+        paymentMode: 'Bank Transfer',
+        category: 'Interest',
+        sourceName: 'Savings account',
+        recurring: false,
+        frequency: 'quarterly',
+        notes: 'Quarterly interest credit.',
+      },
+      now,
+    ),
+    withTimestamps(
+      {
         id: 'sample-fuel',
         type: 'expense',
         title: 'Fuel expense',
@@ -325,6 +360,30 @@ export function addLifeItem(item) {
   return nextItem
 }
 
+export function addLifeItemWithLinkedExpense(item, { recordExpense = false } = {}) {
+  const timestamp = new Date().toISOString()
+  const paidDate = item.status === 'paid' ? item.paidDate || getDateInputValue() : item.paidDate
+  const nextItem = withTimestamps(
+    {
+      ...item,
+      ...(paidDate ? { paidDate } : {}),
+    },
+    timestamp,
+  )
+  const expenseDraft =
+    recordExpense && nextItem.status === 'paid'
+      ? createExpenseFromSourceItem(nextItem, paidDate)
+      : null
+  const expenseItem = expenseDraft ? withTimestamps(expenseDraft, timestamp) : null
+
+  saveLifeItems(expenseItem ? [expenseItem, nextItem, ...getLifeItems()] : [nextItem, ...getLifeItems()])
+  return {
+    expenseCreated: Boolean(expenseItem),
+    expenseItem,
+    item: nextItem,
+  }
+}
+
 export function updateLifeItem(id, updates) {
   const nextItems = getLifeItems().map((item) =>
     item.id === id
@@ -336,16 +395,60 @@ export function updateLifeItem(id, updates) {
   return nextItems.find((item) => item.id === id)
 }
 
-export function markLifeItemPaid(item, { recordExpense = false } = {}) {
+export function updateLifeItemWithLinkedExpense(
+  id,
+  updates,
+  { recordExpense = false } = {},
+) {
+  const timestamp = new Date().toISOString()
+  const paidDate =
+    updates.status === 'paid' ? updates.paidDate || getDateInputValue() : updates.paidDate
+  const currentItems = getLifeItems()
+  let updatedItem = null
+  const nextItems = currentItems.map((item) => {
+    if (item.id !== id) {
+      return item
+    }
+
+    updatedItem = {
+      ...item,
+      ...updates,
+      ...(paidDate ? { paidDate } : {}),
+      updatedAt: timestamp,
+    }
+    return updatedItem
+  })
+  const duplicateExpense = updatedItem ? hasLinkedExpense(currentItems, updatedItem) : false
+  const expenseDraft =
+    recordExpense && updatedItem?.status === 'paid' && !duplicateExpense
+      ? createExpenseFromSourceItem(updatedItem, updatedItem.paidDate || getDateInputValue())
+      : null
+  const expenseItem = expenseDraft ? withTimestamps(expenseDraft, timestamp) : null
+
+  saveLifeItems(expenseItem ? [expenseItem, ...nextItems] : nextItems)
+  return {
+    duplicateSkipped: recordExpense && duplicateExpense,
+    expenseCreated: Boolean(expenseItem),
+    expenseItem,
+    updatedItem,
+  }
+}
+
+export function markLifeItemPaid(item, { recordExpense = false, updates = {} } = {}) {
   const timestamp = new Date().toISOString()
   const paidDate = getDateInputValue()
   const currentItems = getLifeItems()
-  const hasLinkedExpense = currentItems.some(
-    (currentItem) =>
-      currentItem.type === 'expense' && currentItem.linkedItemId === item.id,
-  )
+  const sourceForExpense = {
+    ...item,
+    ...updates,
+    status: 'paid',
+    paidDate,
+  }
+  const duplicateExpense = hasLinkedExpense(currentItems, sourceForExpense)
   const expenseDraft =
-    recordExpense && !hasLinkedExpense ? createExpenseFromPaidItem(item) : null
+    recordExpense && !duplicateExpense
+      ? createExpenseFromSourceItem(sourceForExpense, paidDate)
+      : null
   const expenseItem = expenseDraft
     ? withTimestamps(expenseDraft, timestamp)
     : null
@@ -357,6 +460,7 @@ export function markLifeItemPaid(item, { recordExpense = false } = {}) {
 
     updatedItem = {
       ...currentItem,
+      ...updates,
       status: 'paid',
       paidDate,
       updatedAt: timestamp,
@@ -367,10 +471,42 @@ export function markLifeItemPaid(item, { recordExpense = false } = {}) {
   saveLifeItems(expenseItem ? [expenseItem, ...nextItems] : nextItems)
 
   return {
-    duplicateSkipped: recordExpense && hasLinkedExpense,
+    duplicateSkipped: recordExpense && duplicateExpense,
     expenseCreated: Boolean(expenseItem),
     expenseItem,
     updatedItem,
+  }
+}
+
+export function recordExpenseForLifeItem(item, dateOverride) {
+  const currentItems = getLifeItems()
+  const duplicateExpense = hasLinkedExpense(currentItems, item)
+
+  if (duplicateExpense) {
+    return {
+      duplicateSkipped: true,
+      expenseCreated: false,
+      expenseItem: null,
+      sourceItem: item,
+    }
+  }
+
+  const timestamp = new Date().toISOString()
+  const expenseDraft = createExpenseFromSourceItem(
+    item,
+    dateOverride || item.paidDate || getDateInputValue(),
+  )
+  const expenseItem = expenseDraft ? withTimestamps(expenseDraft, timestamp) : null
+
+  if (expenseItem) {
+    saveLifeItems([expenseItem, ...currentItems])
+  }
+
+  return {
+    duplicateSkipped: false,
+    expenseCreated: Boolean(expenseItem),
+    expenseItem,
+    sourceItem: item,
   }
 }
 

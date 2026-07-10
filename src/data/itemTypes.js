@@ -36,6 +36,12 @@ export const itemTypes = [
     description: 'Small spends and one-time household purchases.',
   },
   {
+    id: 'income',
+    label: 'Income',
+    emoji: '💰',
+    description: 'Salary, refunds, rent, interest, and other money in.',
+  },
+  {
     id: 'document',
     label: 'Document / Receipt',
     emoji: '📄',

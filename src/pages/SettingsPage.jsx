@@ -20,6 +20,7 @@ const statLabels = [
   ['insurance', 'Insurance'],
   ['complaint', 'Complaints'],
   ['expense', 'Expenses'],
+  ['income', 'Income'],
   ['document', 'Documents'],
   ['actionable', 'Open/actionable'],
 ]

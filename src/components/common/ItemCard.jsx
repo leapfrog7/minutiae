@@ -12,6 +12,9 @@ function ItemCard({ dateLabel, framed = true, item, onOpen, showStatus = true })
   const statusMeta = getStatusMeta(item.status)
   const relevantDate = getRelevantDate(item)
   const Wrapper = onOpen ? 'button' : 'article'
+  const amount = getDisplayAmount(item)
+  const subtitle = getSubtitle(item, dateLabel || formatDisplayDate(relevantDate))
+  const detail = getDetail(item)
 
   return (
     <Wrapper
@@ -30,25 +33,29 @@ function ItemCard({ dateLabel, framed = true, item, onOpen, showStatus = true })
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="line-clamp-2 break-words text-sm font-semibold text-stone-950">
-              {item.title}
+              {item.type === 'vendor' ? item.vendorName || item.title : item.title}
             </p>
             <p className="mt-0.5 text-xs text-stone-500">
-              {getItemTypeLabel(item.type)} - {dateLabel || formatDisplayDate(relevantDate)}
+              {subtitle}
             </p>
           </div>
-          {item.amount > 0 && (
+          {amount > 0 && (
             <p className="max-w-[38%] shrink-0 break-words text-right text-sm font-semibold text-stone-900">
-              {formatAmount(item.amount)}
+              {formatAmount(amount)}
             </p>
           )}
         </div>
-        {(item.vendorName ||
+        {(detail ||
+          item.sourceName ||
+          item.vendorName ||
           item.companyOrDepartment ||
           item.category ||
           item.complaintId ||
           item.notes) && (
           <p className="mt-1 line-clamp-1 break-words text-xs text-stone-500">
-            {item.vendorName ||
+            {detail ||
+              item.sourceName ||
+              item.vendorName ||
               item.companyOrDepartment ||
               item.complaintId ||
               item.category ||
@@ -66,6 +73,54 @@ function ItemCard({ dateLabel, framed = true, item, onOpen, showStatus = true })
       </div>
     </Wrapper>
   )
+}
+
+function getDisplayAmount(item) {
+  if (item.type === 'vendor') {
+    return item.status === 'paid'
+      ? Number(item.amountPaid || item.amount || 0)
+      : Number(item.amountDue || item.usualAmount || item.monthlyAmount || item.amount || 0)
+  }
+
+  return Number(item.amount || 0)
+}
+
+function getSubtitle(item, dateLabel) {
+  if (item.type === 'vendor') {
+    return `${item.serviceType || 'Vendor'} - ${dateLabel}`
+  }
+
+  if (item.type === 'income') {
+    return `${item.category || 'Income'} - ${dateLabel}`
+  }
+
+  return `${getItemTypeLabel(item.type)} - ${dateLabel}`
+}
+
+function getDetail(item) {
+  if (item.type !== 'vendor') {
+    if (item.type === 'income') {
+      return item.sourceName || item.category || ''
+    }
+
+    return ''
+  }
+
+  const bits = []
+
+  if (Number(item.balancePayable || 0) > 0) {
+    bits.push(`Balance ${formatAmount(item.balancePayable)}`)
+  }
+
+  if (item.contactNumber) {
+    bits.push(`Phone ${item.contactNumber}`)
+  }
+
+  if (item.upiId) {
+    bits.push(`UPI ${item.upiId}`)
+  }
+
+  return bits.join(' - ')
 }
 
 export default ItemCard

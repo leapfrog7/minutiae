@@ -9,6 +9,7 @@ import {
   getCalendarItems,
   getQuickStatusAction,
   groupAgendaItems,
+  hasLinkedExpense,
 } from '../features/lifeItems/lifeItemHelpers'
 import {
   getLifeItems,
@@ -53,12 +54,18 @@ function CalendarPage({ onNavigate }) {
       return
     }
 
+    if (quickAction.status === 'paid') {
+      markLifeItemPaid(item)
+      refreshItems(null)
+      return
+    }
+
     updateLifeItem(item.id, { status: quickAction.status })
     refreshItems(null)
   }
 
-  function handleConfirmPaid({ recordExpense }) {
-    markLifeItemPaid(pendingPaidItem, { recordExpense })
+  function handleConfirmPaid({ recordExpense, updates }) {
+    markLifeItemPaid(pendingPaidItem, { recordExpense, updates })
     setPendingPaidItem(null)
     refreshItems(null)
   }
@@ -146,18 +153,13 @@ function CalendarPage({ onNavigate }) {
 
       {pendingPaidItem && (
         <MarkPaidDialog
-          duplicateExpense={hasLinkedExpense(items, pendingPaidItem.id)}
+          duplicateExpense={hasLinkedExpense(items, pendingPaidItem)}
+          item={pendingPaidItem}
           onCancel={() => setPendingPaidItem(null)}
           onConfirm={handleConfirmPaid}
         />
       )}
     </>
-  )
-}
-
-function hasLinkedExpense(items, itemId) {
-  return items.some(
-    (item) => item.type === 'expense' && item.linkedItemId === itemId,
   )
 }
 

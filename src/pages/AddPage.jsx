@@ -5,7 +5,7 @@ import SectionCard from '../components/common/SectionCard'
 import AppHeader from '../components/layout/AppHeader'
 import { itemTypes } from '../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../data/itemTypes'
-import { addLifeItem } from '../features/lifeItems/lifeItemStorage'
+import { addLifeItemWithLinkedExpense } from '../features/lifeItems/lifeItemStorage'
 
 function AddPage({ initialType = '', onNavigate }) {
   const [selectedType, setSelectedType] = useState(initialType)
@@ -18,8 +18,23 @@ function AddPage({ initialType = '', onNavigate }) {
     }
   }, [initialType])
 
-  function handleSave(item) {
-    setSavedItem(addLifeItem(item))
+  useEffect(() => {
+    function handleInternalBack(event) {
+      if (!selectedType && !savedItem) {
+        return
+      }
+
+      event.preventDefault()
+      setSavedItem(null)
+      setSelectedType('')
+    }
+
+    window.addEventListener('minutiae:back', handleInternalBack)
+    return () => window.removeEventListener('minutiae:back', handleInternalBack)
+  }, [savedItem, selectedType])
+
+  function handleSave(item, options) {
+    setSavedItem(addLifeItemWithLinkedExpense(item, options).item)
   }
 
   function handleAddAnother() {

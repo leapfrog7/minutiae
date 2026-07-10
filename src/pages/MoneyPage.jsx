@@ -12,8 +12,16 @@ import {
   getCurrentMonthKey,
   getExpenseItemsForMonth,
   getExpenseStatsForMonth,
+  getExpectedIncomeItemsForMonth,
+  getExpectedIncomeTotalForMonth,
+  getIncomeBreakdown,
+  getIncomeTotalForMonth,
   getMonthLabel,
+  getMonthlyBalance,
   getRecurringObligationsForMonth,
+  getReceivedIncomeItemsForMonth,
+  getSavingsRate,
+  getUnpaidExpenseItemsForMonth,
 } from '../features/lifeItems/lifeItemHelpers'
 import { getLifeItems } from '../features/lifeItems/lifeItemStorage'
 
@@ -47,6 +55,34 @@ function MoneyPage({ onNavigate }) {
   }
 
   const currentMonth = getCurrentMonthKey()
+  const incomeItems = useMemo(
+    () => getReceivedIncomeItemsForMonth(items, selectedMonth),
+    [items, selectedMonth],
+  )
+  const expectedIncomeItems = useMemo(
+    () => getExpectedIncomeItemsForMonth(items, selectedMonth),
+    [items, selectedMonth],
+  )
+  const incomeTotal = useMemo(
+    () => getIncomeTotalForMonth(items, selectedMonth),
+    [items, selectedMonth],
+  )
+  const expectedIncomeTotal = useMemo(
+    () => getExpectedIncomeTotalForMonth(items, selectedMonth),
+    [items, selectedMonth],
+  )
+  const monthlyBalance = useMemo(
+    () => getMonthlyBalance(items, selectedMonth),
+    [items, selectedMonth],
+  )
+  const savingsRate = useMemo(
+    () => getSavingsRate(items, selectedMonth),
+    [items, selectedMonth],
+  )
+  const incomeBreakdown = useMemo(
+    () => getIncomeBreakdown(items, selectedMonth),
+    [items, selectedMonth],
+  )
   const expenseItems = useMemo(
     () => getExpenseItemsForMonth(items, selectedMonth),
     [items, selectedMonth],
@@ -63,7 +99,17 @@ function MoneyPage({ onNavigate }) {
     () => getRecurringObligationsForMonth(items, selectedMonth),
     [items, selectedMonth],
   )
+  const unpaidExpenseItems = useMemo(
+    () => getUnpaidExpenseItemsForMonth(items, selectedMonth),
+    [items, selectedMonth],
+  )
+  const unpaidExpenseTotal = unpaidExpenseItems.reduce(
+    (total, item) => total + Number(item.amount || 0),
+    0,
+  )
   const hasExpenses = expenseStats.count > 0
+  const hasIncome = incomeItems.length > 0
+  const hasMoneyRecords = hasIncome || hasExpenses
 
   return (
     <>
@@ -112,6 +158,132 @@ function MoneyPage({ onNavigate }) {
       </SectionCard>
 
       <div className="mt-3 space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <SummaryTile
+            title="Income received"
+            value={formatAmount(incomeTotal)}
+            detail={`${incomeItems.length} entries`}
+            status="received"
+          />
+          <SummaryTile
+            title="Paid expenses"
+            value={formatAmount(expenseStats.total)}
+            detail={`${expenseStats.count} entries`}
+            status="paid"
+          />
+          <SummaryTile
+            title="Balance"
+            value={formatAmount(monthlyBalance)}
+            detail="Income minus expenses"
+            status={monthlyBalance >= 0 ? 'received' : 'overdue'}
+          />
+          <SummaryTile
+            title="Savings rate"
+            value={savingsRate === null ? '-' : `${savingsRate}%`}
+            detail="Of received income"
+            status="open"
+          />
+        </div>
+
+        {!hasMoneyRecords && (
+          <EmptyState
+            title="No money records yet"
+            description="Add salary, other income, or expenses to see your monthly balance."
+            cta={
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate({ page: 'add', type: 'income' })}
+                  className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+                >
+                  Add income
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate({ page: 'add', type: 'expense' })}
+                  className="rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-white"
+                >
+                  Add expense
+                </button>
+              </div>
+            }
+          />
+        )}
+
+        {hasIncome ? (
+          <SectionCard title="Income">
+            <div className="mb-3 rounded-xl bg-emerald-50 px-3 py-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-emerald-700">
+                Total income
+              </p>
+              <p className="mt-1 text-lg font-bold text-stone-950">
+                {formatAmount(incomeTotal)}
+              </p>
+            </div>
+            {incomeBreakdown.length > 0 && (
+              <div className="mb-3 space-y-2">
+                {incomeBreakdown.map((item) => (
+                  <div key={item.category} className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 px-3 py-2 text-sm">
+                    <span className="font-semibold text-stone-700">{item.category}</span>
+                    <span className="font-bold text-stone-950">
+                      {formatAmount(item.total)} - {item.percentage}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="space-y-2">
+              {incomeItems.map((item) => (
+                <ItemCard key={item.id} item={item} onOpen={setSelectedItem} />
+              ))}
+            </div>
+          </SectionCard>
+        ) : (
+          hasMoneyRecords && (
+            <EmptyState
+              title="No income recorded for this month"
+              description="Add salary or other income to compare money in and money out."
+              cta={
+                <button
+                  type="button"
+                  onClick={() => onNavigate({ page: 'add', type: 'income' })}
+                  className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+                >
+                  Add income
+                </button>
+              }
+            />
+          )
+        )}
+
+        {expectedIncomeItems.length > 0 && (
+          <SectionCard title="Expected income">
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-sky-50 px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-sky-700">
+                  Expected
+                </p>
+                <p className="mt-1 text-lg font-bold text-stone-950">
+                  {formatAmount(expectedIncomeTotal)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-sky-50 px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-sky-700">
+                  Count
+                </p>
+                <p className="mt-1 text-lg font-bold text-stone-950">
+                  {expectedIncomeItems.length}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {expectedIncomeItems.map((item) => (
+                <ItemCard key={item.id} item={item} onOpen={setSelectedItem} />
+              ))}
+            </div>
+          </SectionCard>
+        )}
+
         {hasExpenses ? (
           <>
             <div className="grid grid-cols-2 gap-2">
@@ -201,9 +373,10 @@ function MoneyPage({ onNavigate }) {
             </SectionCard>
           </>
         ) : (
+          hasMoneyRecords && (
           <EmptyState
-            title="No expenses recorded yet"
-            description="Add grocery, fuel, eating out, medical, shopping or household expenses to see where the month went."
+            title="No paid expenses recorded yet"
+            description="Add grocery, fuel, eating out, medical, shopping or household expenses as paid to see where the month went."
             cta={
               <button
                 type="button"
@@ -214,6 +387,35 @@ function MoneyPage({ onNavigate }) {
               </button>
             }
           />
+          )
+        )}
+
+        {unpaidExpenseItems.length > 0 && (
+          <SectionCard title="Unpaid expenses">
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-amber-50 px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700">
+                  Total pending
+                </p>
+                <p className="mt-1 text-lg font-bold text-stone-950">
+                  {formatAmount(unpaidExpenseTotal)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-amber-50 px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700">
+                  Count
+                </p>
+                <p className="mt-1 text-lg font-bold text-stone-950">
+                  {unpaidExpenseItems.length}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {unpaidExpenseItems.map((item) => (
+                <ItemCard key={item.id} item={item} onOpen={setSelectedItem} />
+              ))}
+            </div>
+          </SectionCard>
         )}
 
         <SectionCard title="Recurring obligations">

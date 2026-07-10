@@ -8,6 +8,7 @@ export const indiaFirstCategories = [
   'House Tax',
   'School Fee',
   'Insurance',
+  'EMI',
   'Maid',
   'Cook',
   'Milkman',
@@ -26,6 +27,25 @@ export const indiaFirstCategories = [
   'Miscellaneous',
 ]
 
+export const billCategories = indiaFirstCategories.filter(
+  (category) => category !== 'Insurance',
+)
+
+export const expenseCategories = indiaFirstCategories
+
+export const incomeCategories = [
+  'Salary',
+  'Interest',
+  'Rent',
+  'Dividend',
+  'Refund',
+  'Reimbursement',
+  'Freelance',
+  'Gift',
+  'Pension',
+  'Other',
+]
+
 export const paymentModes = [
   'UPI',
   'Cash',
@@ -41,6 +61,6 @@ export const transactionTypes = [
 ]
 
 export const transactionCategories = {
-  income: ['Salary', 'Freelance', 'Business', 'Investments', 'Other Income'],
-  expense: indiaFirstCategories,
+  income: incomeCategories,
+  expense: expenseCategories,
 }

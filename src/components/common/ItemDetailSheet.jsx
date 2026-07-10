@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AddItemForm from '../add/AddItemForm'
 import { getStatusMeta } from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
@@ -9,12 +9,16 @@ import {
   formatDisplayDate,
   getQuickStatusAction,
   getRelevantDate,
+  hasLinkedExpense,
+  shouldOfferRecordExpense,
 } from '../../features/lifeItems/lifeItemHelpers'
 import {
   deleteLifeItem,
   getLifeItems,
   markLifeItemPaid,
+  recordExpenseForLifeItem,
   updateLifeItem,
+  updateLifeItemWithLinkedExpense,
 } from '../../features/lifeItems/lifeItemStorage'
 import ConfirmDialog from './ConfirmDialog'
 import MarkPaidDialog from './MarkPaidDialog'
@@ -25,6 +29,36 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   const [showPaidConfirm, setShowPaidConfirm] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
+  useEffect(() => {
+    function handleInternalBack(event) {
+      if (!item) {
+        return
+      }
+
+      event.preventDefault()
+
+      if (showConfirm) {
+        setShowConfirm(false)
+        return
+      }
+
+      if (showPaidConfirm) {
+        setShowPaidConfirm(false)
+        return
+      }
+
+      if (isEditing) {
+        setIsEditing(false)
+        return
+      }
+
+      onClose()
+    }
+
+    window.addEventListener('minutiae:back', handleInternalBack)
+    return () => window.removeEventListener('minutiae:back', handleInternalBack)
+  }, [isEditing, item, onClose, showConfirm, showPaidConfirm])
+
   if (!item) {
     return null
   }
@@ -32,6 +66,9 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   const typeMeta = getItemTypeMeta(item.type)
   const statusMeta = getStatusMeta(item.status)
   const quickAction = getQuickStatusAction(item)
+  const allItems = getLifeItems()
+  const expenseRecorded = hasLinkedExpense(allItems, item)
+  const canRecordExpense = shouldOfferRecordExpense(item, allItems)
 
   function handleQuickAction() {
     if (!quickAction) {
@@ -43,18 +80,37 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
       return
     }
 
-    const updatedItem = updateLifeItem(item.id, { status: quickAction.status })
+    if (quickAction.status === 'paid') {
+      const result = markLifeItemPaid(item)
+      onItemUpdated(result.updatedItem)
+      return
+    }
+
+    const updates =
+      item.type === 'income' && quickAction.status === 'received'
+        ? { status: quickAction.status, receivedDate: new Date().toISOString().slice(0, 10) }
+        : { status: quickAction.status }
+    const updatedItem = updateLifeItem(item.id, updates)
     onItemUpdated(updatedItem)
   }
 
-  function handleConfirmPaid({ recordExpense }) {
-    const result = markLifeItemPaid(item, { recordExpense })
+  function handleConfirmPaid({ recordExpense, updates }) {
+    const result = markLifeItemPaid(item, { recordExpense, updates })
     setShowPaidConfirm(false)
     onItemUpdated(result.updatedItem)
   }
 
-  function handleEditSave(updates) {
-    const updatedItem = updateLifeItem(item.id, updates)
+  function handleRecordExpense() {
+    recordExpenseForLifeItem(item)
+    onItemUpdated(item)
+  }
+
+  function handleEditSave(updates, options) {
+    const { updatedItem } = updateLifeItemWithLinkedExpense(
+      item.id,
+      updates,
+      options,
+    )
     setIsEditing(false)
     onItemUpdated(updatedItem)
   }
@@ -126,6 +182,11 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
             </div>
 
             <div className="mt-4 grid gap-2">
+              {expenseRecorded && canRecordPaymentAsExpense(item) && (
+                <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                  Expense recorded in Money.
+                </p>
+              )}
               {quickAction && (
                 <button
                   type="button"
@@ -133,6 +194,15 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
                   className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
                 >
                   {quickAction.label}
+                </button>
+              )}
+              {canRecordExpense && (
+                <button
+                  type="button"
+                  onClick={handleRecordExpense}
+                  className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+                >
+                  Record expense
                 </button>
               )}
               <div className="grid grid-cols-2 gap-2">
@@ -167,18 +237,13 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
 
       {showPaidConfirm && (
         <MarkPaidDialog
-          duplicateExpense={hasLinkedExpense(item.id)}
+          duplicateExpense={hasLinkedExpense(getLifeItems(), item)}
+          item={item}
           onCancel={() => setShowPaidConfirm(false)}
           onConfirm={handleConfirmPaid}
         />
       )}
     </>
-  )
-}
-
-function hasLinkedExpense(itemId) {
-  return getLifeItems().some(
-    (item) => item.type === 'expense' && item.linkedItemId === itemId,
   )
 }
 
@@ -228,8 +293,15 @@ function getSpecificRows(item) {
       ['Service', item.serviceType],
       ['Phone', item.contactNumber],
       ['UPI ID', item.upiId],
+      ['Usual amount', formatAmount(item.usualAmount || item.monthlyAmount)],
+      ['Payment frequency', formatCycleLabel(item.paymentFrequency)],
+      ['Payment month', item.paymentMonth],
       ['Payment date', formatOptionalDate(item.paymentDate)],
+      ['Amount due', formatAmount(item.amountDue || item.amount)],
+      ['Adjustment', formatAmount(item.adjustmentAmount)],
       ['Advance', formatAmount(item.advanceGiven)],
+      ['Advance adjusted', formatAmount(item.advanceAdjusted)],
+      ['Amount paid', formatAmount(item.amountPaid)],
       ['Balance', formatAmount(item.balancePayable)],
     ],
     complaint: [
@@ -242,7 +314,15 @@ function getSpecificRows(item) {
     ],
     expense: [
       ['Date', formatOptionalDate(item.date)],
+      ['Paid date', formatOptionalDate(item.paidDate)],
       ['Recurring', item.recurring],
+    ],
+    income: [
+      ['Date', formatOptionalDate(item.date)],
+      ['Received date', formatOptionalDate(item.receivedDate)],
+      ['Source', item.sourceName],
+      ['Recurring', item.recurring],
+      ['Frequency', formatCycleLabel(item.frequency)],
     ],
     document: [
       ['Document type', item.documentType],

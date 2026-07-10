@@ -13,6 +13,10 @@ const searchableFields = [
   'category',
   'notes',
   'vendorName',
+  'serviceType',
+  'contactNumber',
+  'upiId',
+  'sourceName',
   'complaintId',
   'companyOrDepartment',
   'documentType',
@@ -29,6 +33,7 @@ const filterOptions = [
   { id: 'insurance', label: 'Insurance' },
   { id: 'complaint', label: 'Complaints' },
   { id: 'expense', label: 'Expenses' },
+  { id: 'income', label: 'Income' },
   { id: 'document', label: 'Documents' },
 ]
 
@@ -37,6 +42,7 @@ const groupTitles = {
   complaint: 'Complaints',
   document: 'Documents',
   expense: 'Expenses',
+  income: 'Income',
   insurance: 'Insurance',
   subscription: 'Subscriptions',
   vendor: 'Vendors',

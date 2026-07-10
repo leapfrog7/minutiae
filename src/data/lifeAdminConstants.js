@@ -1,10 +1,18 @@
 export { getItemTypeMeta, itemTypes } from './itemTypes'
-export { indiaFirstCategories, paymentModes } from './categories'
+export {
+  billCategories,
+  expenseCategories,
+  incomeCategories,
+  indiaFirstCategories,
+  paymentModes,
+} from './categories'
 
 export const statuses = [
   { id: 'pending', label: 'Pending', tone: 'amber' },
   { id: 'unpaid', label: 'Unpaid', tone: 'amber' },
   { id: 'paid', label: 'Paid', tone: 'emerald' },
+  { id: 'received', label: 'Received', tone: 'emerald' },
+  { id: 'expected', label: 'Expected', tone: 'sky' },
   { id: 'overdue', label: 'Overdue', tone: 'rose' },
   { id: 'open', label: 'Open', tone: 'sky' },
   { id: 'followed_up', label: 'Followed up', tone: 'violet' },

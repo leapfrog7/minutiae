@@ -1,7 +1,7 @@
 import { getItemTypeMeta } from '../../data/itemTypes'
 
 const inactiveStatuses = new Set(['paid', 'archived', 'resolved', 'closed'])
-const expenseRecordableTypes = new Set(['subscription', 'bill', 'vendor', 'insurance'])
+const expenseSourceTypes = new Set(['bill', 'subscription', 'vendor', 'insurance'])
 
 const toDate = (value) => {
   if (!value) {
@@ -176,6 +176,7 @@ export function getLifeItemStats(items) {
       document: 0,
       expense: 0,
       insurance: 0,
+      income: 0,
       lastUpdated: '',
       lastUpdatedTime: 0,
       subscription: 0,
@@ -221,6 +222,14 @@ export function getRelevantDate(item) {
 }
 
 export function getQuickStatusAction(item) {
+  if (item.type === 'income' && item.status === 'expected') {
+    return { label: 'Mark Received', status: 'received' }
+  }
+
+  if (item.type === 'expense' && item.status === 'unpaid') {
+    return { label: 'Mark Paid', status: 'paid' }
+  }
+
   if (item.type === 'bill' && ['unpaid', 'overdue'].includes(item.status)) {
     return { label: 'Mark Paid', status: 'paid' }
   }
@@ -254,19 +263,30 @@ export function getQuickStatusAction(item) {
 }
 
 export function canRecordPaymentAsExpense(item) {
-  return expenseRecordableTypes.has(item.type)
+  return isExpenseSourceType(item)
 }
 
-export function createExpenseFromPaidItem(item) {
-  if (!canRecordPaymentAsExpense(item)) {
-    return null
+export function isExpenseSourceType(item) {
+  return expenseSourceTypes.has(item?.type)
+}
+
+export function getItemAmount(item) {
+  if (item.type === 'insurance') {
+    return Number(item.premiumAmount || item.amount || 0)
   }
 
-  const title = item.type === 'vendor' ? item.vendorName || item.title : item.title
-  const amountByType = {
-    insurance: item.premiumAmount || item.amount,
-    vendor: item.monthlyAmount || item.amount,
+  if (item.type === 'vendor') {
+    if (item.status === 'paid') {
+      return Number(item.amountPaid || item.amount || item.monthlyAmount || item.usualAmount || 0)
+    }
+
+    return Number(item.amountDue || item.amount || item.monthlyAmount || item.usualAmount || 0)
   }
+
+  return Number(item.amount || 0)
+}
+
+export function getExpenseCategoryForSourceItem(item) {
   const categoryByType = {
     bill: item.category || 'Bills',
     insurance: 'Insurance',
@@ -274,18 +294,81 @@ export function createExpenseFromPaidItem(item) {
     vendor: item.serviceType || 'Local Vendors',
   }
 
+  return categoryByType[item.type] || 'Miscellaneous'
+}
+
+export function hasLinkedExpense(items, sourceItem) {
+  return items.some(
+    (item) => item.type === 'expense' && item.linkedItemId === sourceItem?.id,
+  )
+}
+
+export function shouldOfferRecordExpense(item, items) {
+  return (
+    isExpenseSourceType(item) &&
+    item.status === 'paid' &&
+    !hasLinkedExpense(items, item)
+  )
+}
+
+export function createExpenseFromSourceItem(sourceItem, dateOverride) {
+  if (!isExpenseSourceType(sourceItem)) {
+    return null
+  }
+
+  const title =
+    sourceItem.type === 'vendor'
+      ? getVendorTitle(sourceItem)
+      : sourceItem.title
+  const date =
+    dateOverride ||
+    (sourceItem.type === 'vendor' ? sourceItem.paidDate || sourceItem.paymentDate : '') ||
+    getDateInputValue()
+  const notes =
+    sourceItem.type === 'vendor'
+      ? `Recorded from paid vendor payment: ${title}`
+      : `Recorded from paid ${sourceItem.type}: ${title}`
+
   return {
     type: 'expense',
     title,
-    amount: Number(amountByType[item.type] || item.amount || 0),
-    date: getDateInputValue(),
-    category: categoryByType[item.type],
-    paymentMode: item.paymentMode || '',
-    recurring: true,
-    notes: `Recorded from paid ${item.type}: ${title}`,
-    linkedItemId: item.id,
+    amount: getItemAmount(sourceItem),
+    date,
+    paidDate: date,
+    category: getExpenseCategoryForSourceItem(sourceItem),
+    paymentMode: sourceItem.paymentMode || '',
+    recurring:
+      sourceItem.type === 'vendor'
+        ? ['monthly', 'weekly'].includes(sourceItem.paymentFrequency)
+        : sourceItem.type !== 'bill',
+    notes,
+    linkedItemId: sourceItem.id,
+    linkedItemType: sourceItem.type,
     status: 'paid',
   }
+}
+
+export const createExpenseFromPaidItem = createExpenseFromSourceItem
+
+export function calculateVendorSettlement(item) {
+  const amountDue = Number(item.amountDue || item.usualAmount || item.monthlyAmount || item.amount || 0)
+  const adjustmentAmount = Number(item.adjustmentAmount || 0)
+  const advanceAdjusted = Number(item.advanceAdjusted || 0)
+  const amountPaid = Number(item.amountPaid || 0)
+  const netDue = Math.max(amountDue - adjustmentAmount - advanceAdjusted, 0)
+  const balancePayable = Math.max(netDue - amountPaid, 0)
+
+  return {
+    amountPaid,
+    balancePayable,
+    netDue,
+  }
+}
+
+export function getVendorTitle(item) {
+  const vendorName = item.vendorName || item.title || 'Vendor'
+  const serviceType = item.serviceType || item.category || 'Local Vendors'
+  return `${vendorName} - ${serviceType}`
 }
 
 export function getDateInputValue(date = new Date()) {
@@ -455,12 +538,41 @@ export function getUpcomingRenewals(items, days = 30) {
 }
 
 export function getMonthlyExpenseItems(items, monthKey) {
-  return getExpenseItemsForMonth(items, monthKey)
+  return getPaidExpenseItemsForMonth(items, monthKey)
 }
 
 export function getExpenseItemsForMonth(items, monthKey) {
+  return getPaidExpenseItemsForMonth(items, monthKey)
+}
+
+export function isPaidExpense(item) {
+  return (
+    item.type === 'expense' &&
+    Number(item.amount) > 0 &&
+    (!item.status || item.status === 'paid')
+  )
+}
+
+export function getPaidExpenseItemsForMonth(items, monthKey) {
   return getItemsForMonth(
-    items.filter((item) => item.type === 'expense' && Number(item.amount) > 0),
+    items.filter(isPaidExpense),
+    monthKey,
+    (item) => item.date,
+  ).sort((a, b) => {
+    const aDate = toDate(a.date)?.getTime() ?? 0
+    const bDate = toDate(b.date)?.getTime() ?? 0
+    return bDate - aDate
+  })
+}
+
+export function getUnpaidExpenseItemsForMonth(items, monthKey) {
+  return getItemsForMonth(
+    items.filter(
+      (item) =>
+        item.type === 'expense' &&
+        item.status === 'unpaid' &&
+        Number(item.amount) > 0,
+    ),
     monthKey,
     (item) => item.date,
   ).sort((a, b) => {
@@ -475,6 +587,86 @@ export function getMonthlyExpenseTotal(items, monthKey) {
     (total, item) => total + Number(item.amount || 0),
     0,
   )
+}
+
+export function isIncomeItem(item) {
+  return item.type === 'income' && Number(item.amount) > 0
+}
+
+export function isReceivedIncome(item) {
+  return isIncomeItem(item) && (!item.status || item.status === 'received')
+}
+
+export function isExpectedIncome(item) {
+  return isIncomeItem(item) && item.status === 'expected'
+}
+
+export function getIncomeItemsForMonth(items, monthKey) {
+  return getItemsForMonth(
+    items.filter(isIncomeItem),
+    monthKey,
+    (item) => item.date,
+  ).sort((a, b) => {
+    const aDate = toDate(a.date)?.getTime() ?? 0
+    const bDate = toDate(b.date)?.getTime() ?? 0
+    return bDate - aDate
+  })
+}
+
+export function getReceivedIncomeItemsForMonth(items, monthKey) {
+  return getIncomeItemsForMonth(items, monthKey).filter(isReceivedIncome)
+}
+
+export function getExpectedIncomeItemsForMonth(items, monthKey) {
+  return getIncomeItemsForMonth(items, monthKey).filter(isExpectedIncome)
+}
+
+export function getIncomeTotalForMonth(items, monthKey) {
+  return getReceivedIncomeItemsForMonth(items, monthKey).reduce(
+    (total, item) => total + Number(item.amount || 0),
+    0,
+  )
+}
+
+export function getExpectedIncomeTotalForMonth(items, monthKey) {
+  return getExpectedIncomeItemsForMonth(items, monthKey).reduce(
+    (total, item) => total + Number(item.amount || 0),
+    0,
+  )
+}
+
+export function getIncomeBreakdown(items, monthKey) {
+  const monthlyTotal = getIncomeTotalForMonth(items, monthKey)
+  const totals = getReceivedIncomeItemsForMonth(items, monthKey).reduce(
+    (summary, item) => {
+      const category = item.category || 'Other'
+      summary[category] = (summary[category] || 0) + Number(item.amount || 0)
+      return summary
+    },
+    {},
+  )
+
+  return Object.entries(totals)
+    .map(([category, total]) => ({
+      category,
+      percentage: monthlyTotal ? Math.round((total / monthlyTotal) * 100) : 0,
+      total,
+    }))
+    .sort((a, b) => b.total - a.total)
+}
+
+export function getMonthlyBalance(items, monthKey) {
+  return getIncomeTotalForMonth(items, monthKey) - getMonthlyExpenseTotal(items, monthKey)
+}
+
+export function getSavingsRate(items, monthKey) {
+  const income = getIncomeTotalForMonth(items, monthKey)
+
+  if (!income) {
+    return null
+  }
+
+  return Math.round((getMonthlyBalance(items, monthKey) / income) * 100)
 }
 
 export function getRecurringMonthlyCost(items, monthKey) {

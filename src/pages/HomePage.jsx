@@ -4,6 +4,7 @@ import EmptyState from '../components/common/EmptyState'
 import ItemDetailSheet from '../components/common/ItemDetailSheet'
 import MarkPaidDialog from '../components/common/MarkPaidDialog'
 import SectionCard from '../components/common/SectionCard'
+import SummaryPreviewSheet from '../components/dashboard/SummaryPreviewSheet'
 import SummaryTile from '../components/dashboard/SummaryTile'
 import AppHeader from '../components/layout/AppHeader'
 import {
@@ -11,11 +12,16 @@ import {
   formatRelativeDueLabel,
   canRecordPaymentAsExpense,
   getCurrentMonthKey,
+  getExpenseItemsForMonth,
+  getItemsDueSoon,
   getMonthlyExpenseTotal,
+  getOpenComplaints,
+  getOverdueItems,
   getPriorityItems,
   getQuickStatusAction,
   getRelevantDate,
-  getThisWeekSummary,
+  getUpcomingRenewals,
+  hasLinkedExpense,
   getTodayActionSummary,
 } from '../features/lifeItems/lifeItemHelpers'
 import {
@@ -27,6 +33,7 @@ import {
 function HomePage({ onNavigate }) {
   const [items, setItems] = useState([])
   const [pendingPaidItem, setPendingPaidItem] = useState(null)
+  const [preview, setPreview] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
 
   useEffect(() => {
@@ -50,32 +57,89 @@ function HomePage({ onNavigate }) {
       return
     }
 
+    if (quickAction.status === 'paid') {
+      markLifeItemPaid(item)
+      refreshItems(null)
+      return
+    }
+
     updateLifeItem(item.id, { status: quickAction.status })
     refreshItems(null)
   }
 
-  function handleConfirmPaid({ recordExpense }) {
-    markLifeItemPaid(pendingPaidItem, { recordExpense })
+  function handleConfirmPaid({ recordExpense, updates }) {
+    markLifeItemPaid(pendingPaidItem, { recordExpense, updates })
     setPendingPaidItem(null)
     refreshItems(null)
   }
 
   const priorityItems = useMemo(() => getPriorityItems(items, 5), [items])
   const todaySummary = useMemo(() => getTodayActionSummary(items), [items])
-  const weekSummary = useMemo(() => getThisWeekSummary(items), [items])
+  const currentMonth = getCurrentMonthKey()
   const monthlyTotal = useMemo(
-    () => getMonthlyExpenseTotal(items, getCurrentMonthKey()),
-    [items],
+    () => getMonthlyExpenseTotal(items, currentMonth),
+    [items, currentMonth],
   )
+  const previewData = useMemo(
+    () => getSummaryPreviewData(items, currentMonth),
+    [items, currentMonth],
+  )
+  const activePreview = preview ? previewData[preview] : null
+  const todayPreview = previewData.today
+  const todayCount = todayPreview.items.length
+  const todayAmount = formatAmount(todaySummary.amountDue)
+  const summaries = [
+    {
+      detail: 'Next 7 days',
+      id: 'dueSoon',
+      status: 'pending',
+      title: 'Due soon',
+      value: previewData.dueSoon.items.length,
+    },
+    {
+      detail: 'Needs action',
+      id: 'overdue',
+      status: 'overdue',
+      title: 'Overdue',
+      value: previewData.overdue.items.length,
+    },
+    {
+      detail: 'Follow-up pending',
+      id: 'complaints',
+      status: 'open',
+      title: 'Open complaints',
+      value: previewData.complaints.items.length,
+    },
+    {
+      detail: 'Next 30 days',
+      id: 'renewals',
+      status: 'followed_up',
+      title: 'Renewals',
+      value: previewData.renewals.items.length,
+    },
+    {
+      detail: 'Paid expenses this month',
+      id: 'spending',
+      status: 'paid',
+      title: 'Month spend',
+      value: formatAmount(monthlyTotal),
+    },
+  ]
   const hasItems = items.length > 0
 
-  const summaries = [
-    { title: 'Due this week', value: weekSummary.dueThisWeek, detail: 'Next 7 days', status: 'pending' },
-    { title: 'Overdue', value: weekSummary.overdue, detail: 'Needs action', status: 'overdue' },
-    { title: 'Open complaints', value: weekSummary.openComplaints, detail: 'Follow-ups', status: 'open' },
-    { title: 'Renewals', value: weekSummary.upcomingRenewals, detail: 'Next 30 days', status: 'followed_up' },
-    { title: 'Month spend', value: formatAmount(monthlyTotal), detail: 'Explicit expenses', status: 'paid' },
-  ]
+  useEffect(() => {
+    function handleInternalBack(event) {
+      if (!preview || selectedItem) {
+        return
+      }
+
+      event.preventDefault()
+      setPreview(null)
+    }
+
+    window.addEventListener('minutiae:back', handleInternalBack)
+    return () => window.removeEventListener('minutiae:back', handleInternalBack)
+  }, [preview, selectedItem])
 
   const settingsAction = (
     <button
@@ -87,6 +151,14 @@ function HomePage({ onNavigate }) {
       Settings
     </button>
   )
+
+  function openPreview(id) {
+    setPreview(id)
+  }
+
+  function openPreviewItem(item) {
+    setSelectedItem(item)
+  }
 
   return (
     <>
@@ -137,28 +209,46 @@ function HomePage({ onNavigate }) {
           </SectionCard>
 
           <SectionCard title="Today">
-            {todaySummary.dueCount > 0 ? (
-              <div className="grid grid-cols-3 gap-2">
-                <TodayMetric label="Due" value={todaySummary.dueCount} />
-                <TodayMetric label="Follow-ups" value={todaySummary.followUpCount} />
-                <TodayMetric
-                  label="Amount"
-                  value={formatAmount(todaySummary.amountDue)}
-                />
-              </div>
-            ) : (
-              <p className="rounded-xl bg-stone-50 px-3 py-3 text-sm font-semibold text-stone-600">
-                Nothing due today.
-              </p>
-            )}
+            <button
+              type="button"
+              onClick={() => openPreview('today')}
+              className="w-full rounded-xl bg-stone-50 px-2 py-2 text-left transition hover:bg-teal-50/50"
+            >
+              {todayCount > 0 ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <TodayMetric label="Due" value={todaySummary.dueCount} />
+                  <TodayMetric label="Follow-ups" value={todaySummary.followUpCount} />
+                  <TodayMetric label="Amount" value={todayAmount} />
+                </div>
+              ) : (
+                <p className="px-1 py-1 text-sm font-semibold text-stone-600">
+                  Nothing due today.
+                </p>
+              )}
+              <p className="mt-2 px-1 text-xs font-bold text-teal-700">View -&gt;</p>
+            </button>
           </SectionCard>
 
           <div className="grid grid-cols-2 gap-2">
             {summaries.map((summary) => (
-              <SummaryTile key={summary.title} {...summary} />
+              <SummaryTile
+                key={summary.id}
+                {...summary}
+                onClick={() => openPreview(summary.id)}
+              />
             ))}
           </div>
         </div>
+      )}
+
+      {activePreview && (
+        <SummaryPreviewSheet
+          {...activePreview}
+          count={activePreview.items.length}
+          onClose={() => setPreview(null)}
+          onOpenItem={openPreviewItem}
+          suspendBack={Boolean(selectedItem)}
+        />
       )}
 
       <ItemDetailSheet
@@ -170,7 +260,8 @@ function HomePage({ onNavigate }) {
 
       {pendingPaidItem && (
         <MarkPaidDialog
-          duplicateExpense={hasLinkedExpense(items, pendingPaidItem.id)}
+          duplicateExpense={hasLinkedExpense(items, pendingPaidItem)}
+          item={pendingPaidItem}
           onCancel={() => setPendingPaidItem(null)}
           onConfirm={handleConfirmPaid}
         />
@@ -179,15 +270,55 @@ function HomePage({ onNavigate }) {
   )
 }
 
-function hasLinkedExpense(items, itemId) {
-  return items.some(
-    (item) => item.type === 'expense' && item.linkedItemId === itemId,
-  )
+function getSummaryPreviewData(items, currentMonth) {
+  const todayItems = getTodayActionSummary(items).items
+  const spendingItems = getExpenseItemsForMonth(items, currentMonth)
+
+  return {
+    complaints: {
+      description: 'Complaints that still need a follow-up or resolution.',
+      emptyText: 'No open complaints.',
+      items: getOpenComplaints(items),
+      title: 'Open complaints',
+    },
+    dueSoon: {
+      description: 'Items needing attention in the next 7 days.',
+      emptyText: 'Nothing due in the next 7 days.',
+      items: getItemsDueSoon(items, 7),
+      title: 'Due soon',
+    },
+    overdue: {
+      description: 'Items past their relevant date and still open.',
+      emptyText: 'No overdue items.',
+      items: getOverdueItems(items),
+      title: 'Overdue',
+    },
+    renewals: {
+      description: 'Renewals and expiries coming up in the next 30 days.',
+      emptyText: 'No renewals coming up.',
+      items: getUpcomingRenewals(items, 30),
+      title: 'Upcoming renewals',
+    },
+    spending: {
+      description: `Paid expenses recorded this month. Total ${formatAmount(
+        spendingItems.reduce((total, item) => total + Number(item.amount || 0), 0),
+      )}.`,
+      emptyText: 'No paid expenses recorded this month.',
+      items: spendingItems,
+      title: 'Monthly spending',
+    },
+    today: {
+      description: 'Items due or needing follow-up today.',
+      emptyText: 'Nothing due today.',
+      items: todayItems,
+      title: 'Today',
+    },
+  }
 }
 
 function TodayMetric({ label, value }) {
   return (
-    <div className="rounded-xl bg-stone-50 px-2 py-2 text-center">
+    <div className="rounded-xl bg-white px-2 py-2 text-center ring-1 ring-stone-200">
       <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500">
         {label}
       </p>

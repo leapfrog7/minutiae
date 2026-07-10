@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 function ConfirmDialog({
   confirmLabel = 'Delete',
   message,
@@ -10,6 +12,16 @@ function ConfirmDialog({
     tone === 'danger'
       ? 'bg-rose-600 text-white'
       : 'bg-teal-700 text-white'
+
+  useEffect(() => {
+    function handleInternalBack(event) {
+      event.preventDefault()
+      onCancel()
+    }
+
+    window.addEventListener('minutiae:back', handleInternalBack)
+    return () => window.removeEventListener('minutiae:back', handleInternalBack)
+  }, [onCancel])
 
   return (
     <div

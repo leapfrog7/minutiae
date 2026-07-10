@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getStatusMeta, indiaFirstCategories, paymentModes } from '../../data/lifeAdminConstants'
+import {
+  billCategories,
+  expenseCategories,
+  getStatusMeta,
+  incomeCategories,
+  indiaFirstCategories,
+  paymentModes,
+} from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
+import {
+  calculateVendorSettlement,
+  hasLinkedExpense,
+} from '../../features/lifeItems/lifeItemHelpers'
+import { getLifeItems } from '../../features/lifeItems/lifeItemStorage'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -20,9 +32,10 @@ const defaultValuesByType = {
   bill: {
     title: '',
     amount: '',
-    dueDate: '',
+    dueDate: today(),
     frequency: 'monthly',
     status: 'unpaid',
+    addToMoney: 'yes',
     paymentMode: 'UPI',
     category: 'Electricity',
     notes: '',
@@ -42,14 +55,23 @@ const defaultValuesByType = {
   },
   vendor: {
     vendorName: '',
-    serviceType: '',
+    serviceType: 'Maid',
+    usualAmount: '',
     monthlyAmount: '',
+    paymentFrequency: 'monthly',
     contactNumber: '',
     upiId: '',
-    paymentDate: '',
+    paymentDate: today(),
+    paymentMonth: today().slice(0, 7),
     status: 'unpaid',
+    amountDue: '',
+    adjustmentAmount: '',
     advanceGiven: '',
+    advanceAdjusted: '',
     balancePayable: '',
+    amountPaid: '',
+    autoPay: 'no',
+    addToMoney: 'yes',
     paymentMode: 'UPI',
     notes: '',
   },
@@ -74,6 +96,18 @@ const defaultValuesByType = {
     status: 'paid',
     notes: '',
   },
+  income: {
+    title: 'Salary',
+    amount: '',
+    date: today(),
+    category: 'Salary',
+    sourceName: 'Employer',
+    recurring: 'yes',
+    frequency: 'monthly',
+    paymentMode: 'Bank Transfer',
+    status: 'received',
+    notes: '',
+  },
   document: {
     title: '',
     documentType: '',
@@ -92,7 +126,8 @@ const statusOptionsByType = {
   insurance: ['unpaid', 'paid', 'overdue'],
   vendor: ['unpaid', 'paid', 'overdue'],
   complaint: ['open', 'followed_up', 'resolved', 'closed'],
-  expense: ['paid', 'pending'],
+  expense: ['paid', 'unpaid'],
+  income: ['received', 'expected'],
   document: ['pending', 'closed'],
 }
 
@@ -106,6 +141,31 @@ const frequencyOptions = [
 const billingCycleOptions = frequencyOptions.filter(
   (option) => option.value !== 'one_time',
 )
+const vendorFrequencyOptions = [
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'one_time', label: 'One-time' },
+  { value: 'as_needed', label: 'As needed' },
+]
+const vendorServiceTypes = [
+  'Maid',
+  'Cook',
+  'Milkman',
+  'Newspaper',
+  'Ironing',
+  'Car Cleaner',
+  'Driver',
+  'Tutor',
+  'Garbage Collector',
+  'Gardener',
+  'Security / Society',
+  'Plumber',
+  'Electrician',
+  'RO Service',
+  'AC Service',
+  'Appliance Repair',
+  'Other',
+]
 
 const toNumber = (value) => (value === '' ? 0 : Number(value))
 
@@ -161,7 +221,23 @@ function AddItemForm({
   }, [initialForm])
 
   function updateField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }))
+    setForm((current) => {
+      const nextForm = { ...current, [field]: value }
+
+      if (selectedType === 'income' && field === 'category') {
+        if (value === 'Salary') {
+          nextForm.title = current.title || 'Salary'
+          nextForm.sourceName = current.sourceName || 'Employer'
+          nextForm.recurring = 'yes'
+          nextForm.frequency = 'monthly'
+        } else if (current.title === 'Salary') {
+          nextForm.title = ''
+          nextForm.recurring = 'no'
+        }
+      }
+
+      return nextForm
+    })
   }
 
   function handleSubmit(event) {
@@ -172,7 +248,7 @@ function AddItemForm({
       return
     }
 
-    onSave(buildLifeItem(selectedType, form))
+    onSave(buildLifeItem(selectedType, form), getSaveOptions(selectedType, form))
     setForm(initialForm)
     setSubmitted(false)
   }
@@ -251,7 +327,19 @@ function AddItemForm({
                 {frequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </SelectInput>
             </Field>
-            <CommonMoneyFields form={form} updateField={updateField} statusOptions={statusOptions} />
+            <CommonMoneyFields
+              categoryOptions={billCategories}
+              form={form}
+              updateField={updateField}
+              statusOptions={statusOptions}
+            />
+            <AddToMoneyOption
+              duplicateExpense={hasExistingLinkedExpense(initialItem)}
+              itemType="bill"
+              status={form.status}
+              value={form.addToMoney}
+              onChange={(value) => updateField('addToMoney', value)}
+            />
           </>
         )}
 
@@ -297,44 +385,94 @@ function AddItemForm({
 
         {selectedType === 'vendor' && (
           <>
-            <Field label="Vendor" error={showError('vendorName')}>
-              <TextInput value={form.vendorName} onChange={(event) => updateField('vendorName', event.target.value)} placeholder="Maid, milkman, ironing person" />
-            </Field>
-            <TwoFields>
-              <Field label="Service" error={showError('serviceType')}>
-                <TextInput value={form.serviceType} onChange={(event) => updateField('serviceType', event.target.value)} placeholder="House help" />
+            <FormGroup title="Vendor details">
+              <Field label="Vendor" error={showError('vendorName')}>
+                <TextInput value={form.vendorName} onChange={(event) => updateField('vendorName', event.target.value)} placeholder="Rani, Mother Dairy booth..." />
               </Field>
-              <Field label="Monthly amount" error={showError('monthlyAmount')}>
-                <TextInput type="number" min="0" inputMode="decimal" value={form.monthlyAmount} onChange={(event) => updateField('monthlyAmount', event.target.value)} />
+              <TwoFields>
+                <Field label="Service" error={showError('serviceType')}>
+                  <SelectInput value={form.serviceType} onChange={(event) => updateField('serviceType', event.target.value)}>
+                    {vendorServiceTypes.map((service) => <option key={service} value={service}>{service}</option>)}
+                  </SelectInput>
+                </Field>
+                <Field label="Phone">
+                  <TextInput type="tel" value={form.contactNumber} onChange={(event) => updateField('contactNumber', event.target.value)} />
+                </Field>
+              </TwoFields>
+              <Field label="UPI ID">
+                <TextInput value={form.upiId} onChange={(event) => updateField('upiId', event.target.value)} placeholder="name@upi" />
               </Field>
-            </TwoFields>
-            <TwoFields>
-              <Field label="Payment date" error={showError('paymentDate')}>
-                <TextInput type="date" value={form.paymentDate} onChange={(event) => updateField('paymentDate', event.target.value)} />
-              </Field>
-              <Field label="Phone">
-                <TextInput type="tel" value={form.contactNumber} onChange={(event) => updateField('contactNumber', event.target.value)} />
-              </Field>
-            </TwoFields>
-            <TwoFields>
-              <Field label="Advance">
-                <TextInput type="number" min="0" inputMode="decimal" value={form.advanceGiven} onChange={(event) => updateField('advanceGiven', event.target.value)} />
-              </Field>
-              <Field label="Balance">
-                <TextInput type="number" min="0" inputMode="decimal" value={form.balancePayable} onChange={(event) => updateField('balancePayable', event.target.value)} />
-              </Field>
-            </TwoFields>
-            <Field label="UPI ID">
-              <TextInput value={form.upiId} onChange={(event) => updateField('upiId', event.target.value)} placeholder="name@upi" />
-            </Field>
-            <TwoFields>
-              <Field label="Status">
-                <StatusSelect value={form.status} options={statusOptions} onChange={(value) => updateField('status', value)} />
-              </Field>
+            </FormGroup>
+
+            <FormGroup title="Payment arrangement">
+              <TwoFields>
+                <Field label="Usual amount">
+                  <TextInput type="number" min="0" inputMode="decimal" value={form.usualAmount} onChange={(event) => updateField('usualAmount', event.target.value)} />
+                </Field>
+                <Field label="Frequency">
+                  <SelectInput value={form.paymentFrequency} onChange={(event) => updateField('paymentFrequency', event.target.value)}>
+                    {vendorFrequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </SelectInput>
+                </Field>
+              </TwoFields>
+              <TwoFields>
+                <Field label="Pay date" error={showError('paymentDate')}>
+                  <TextInput type="date" value={form.paymentDate} onChange={(event) => updateField('paymentDate', event.target.value)} />
+                </Field>
+                <Field label="Auto-pay">
+                  <SelectInput value={form.autoPay} onChange={(event) => updateField('autoPay', event.target.value)}>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </SelectInput>
+                </Field>
+              </TwoFields>
+            </FormGroup>
+
+            <FormGroup title="This payment">
+              <TwoFields>
+                <Field label="Month">
+                  <TextInput type="month" value={form.paymentMonth} onChange={(event) => updateField('paymentMonth', event.target.value)} />
+                </Field>
+                <Field label="Due" error={showError('vendorAmount')}>
+                  <TextInput type="number" min="0" inputMode="decimal" value={form.amountDue} onChange={(event) => updateField('amountDue', event.target.value)} />
+                </Field>
+              </TwoFields>
+              <TwoFields>
+                <Field label="Adjust">
+                  <TextInput type="number" min="0" inputMode="decimal" value={form.adjustmentAmount} onChange={(event) => updateField('adjustmentAmount', event.target.value)} />
+                </Field>
+                <Field label="Adv. adjusted">
+                  <TextInput type="number" min="0" inputMode="decimal" value={form.advanceAdjusted} onChange={(event) => updateField('advanceAdjusted', event.target.value)} />
+                </Field>
+              </TwoFields>
+              <TwoFields>
+                <Field label="Advance given">
+                  <TextInput type="number" min="0" inputMode="decimal" value={form.advanceGiven} onChange={(event) => updateField('advanceGiven', event.target.value)} />
+                </Field>
+                <Field label="Paid" error={showError('amountPaid')}>
+                  <TextInput type="number" min="0" inputMode="decimal" value={form.amountPaid} onChange={(event) => updateField('amountPaid', event.target.value)} />
+                </Field>
+              </TwoFields>
+              <TwoFields>
+                <Field label="Balance">
+                  <TextInput type="number" min="0" inputMode="decimal" value={form.balancePayable} onChange={(event) => updateField('balancePayable', event.target.value)} />
+                </Field>
+                <Field label="Status">
+                  <StatusSelect value={form.status} options={statusOptions} onChange={(value) => updateField('status', value)} />
+                </Field>
+              </TwoFields>
               <Field label="Payment">
                 <PaymentSelect value={form.paymentMode} onChange={(value) => updateField('paymentMode', value)} />
               </Field>
-            </TwoFields>
+              <VendorSettlementSummary form={form} />
+              <AddToMoneyOption
+                duplicateExpense={hasExistingLinkedExpense(initialItem)}
+                itemType="vendor payment"
+                status={form.status}
+                value={form.addToMoney}
+                onChange={(value) => updateField('addToMoney', value)}
+              />
+            </FormGroup>
           </>
         )}
 
@@ -386,12 +524,64 @@ function AddItemForm({
                 <TextInput type="date" value={form.date} onChange={(event) => updateField('date', event.target.value)} />
               </Field>
             </TwoFields>
-            <CommonMoneyFields form={form} updateField={updateField} statusOptions={statusOptions} />
+            <CommonMoneyFields
+              categoryOptions={expenseCategories}
+              form={form}
+              updateField={updateField}
+              statusOptions={statusOptions}
+            />
             <Field label="Recurring">
               <SelectInput value={form.recurring} onChange={(event) => updateField('recurring', event.target.value)}>
                 <option value="no">No</option>
                 <option value="yes">Yes</option>
               </SelectInput>
+            </Field>
+          </>
+        )}
+
+        {selectedType === 'income' && (
+          <>
+            <Field label="Title" error={showError('title')}>
+              <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="Salary, rent, refund..." />
+            </Field>
+            <TwoFields>
+              <Field label="Amount" error={showError('amount')}>
+                <TextInput type="number" min="0" inputMode="decimal" value={form.amount} onChange={(event) => updateField('amount', event.target.value)} />
+              </Field>
+              <Field label="Date received" error={showError('date')}>
+                <TextInput type="date" value={form.date} onChange={(event) => updateField('date', event.target.value)} />
+              </Field>
+            </TwoFields>
+            <TwoFields>
+              <Field label="Category" error={showError('category')}>
+                <CategorySelect
+                  options={incomeCategories}
+                  value={form.category}
+                  onChange={(value) => updateField('category', value)}
+                />
+              </Field>
+              <Field label="Status" error={showError('status')}>
+                <StatusSelect value={form.status} options={statusOptions} onChange={(value) => updateField('status', value)} />
+              </Field>
+            </TwoFields>
+            <Field label="Source">
+              <TextInput value={form.sourceName} onChange={(event) => updateField('sourceName', event.target.value)} placeholder="Employer, tenant, bank..." />
+            </Field>
+            <TwoFields>
+              <Field label="Recurring income">
+                <SelectInput value={form.recurring} onChange={(event) => updateField('recurring', event.target.value)}>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </SelectInput>
+              </Field>
+              <Field label="Frequency">
+                <SelectInput value={form.frequency} onChange={(event) => updateField('frequency', event.target.value)}>
+                  {frequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </SelectInput>
+              </Field>
+            </TwoFields>
+            <Field label="Received in">
+              <PaymentSelect value={form.paymentMode} onChange={(value) => updateField('paymentMode', value)} />
             </Field>
           </>
         )}
@@ -445,7 +635,23 @@ function TwoFields({ children }) {
   return <div className="grid grid-cols-2 gap-2">{children}</div>
 }
 
-function CommonMoneyFields({ form, statusOptions, updateField }) {
+function FormGroup({ children, title }) {
+  return (
+    <section className="grid gap-3 rounded-xl bg-stone-50 px-3 py-3">
+      <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-stone-500">
+        {title}
+      </h3>
+      {children}
+    </section>
+  )
+}
+
+function CommonMoneyFields({
+  categoryOptions = indiaFirstCategories,
+  form,
+  statusOptions,
+  updateField,
+}) {
   return (
     <>
       <TwoFields>
@@ -457,16 +663,23 @@ function CommonMoneyFields({ form, statusOptions, updateField }) {
         </Field>
       </TwoFields>
       <Field label="Category">
-        <CategorySelect value={form.category} onChange={(value) => updateField('category', value)} />
+        <CategorySelect
+          options={categoryOptions}
+          value={form.category}
+          onChange={(value) => updateField('category', value)}
+        />
       </Field>
     </>
   )
 }
 
-function CategorySelect({ onChange, value }) {
+function CategorySelect({ onChange, options = indiaFirstCategories, value }) {
+  const renderedOptions =
+    value && !options.includes(value) ? [value, ...options] : options
+
   return (
     <SelectInput value={value} onChange={(event) => onChange(event.target.value)}>
-      {indiaFirstCategories.map((category) => (
+      {renderedOptions.map((category) => (
         <option key={category} value={category}>
           {category}
         </option>
@@ -499,6 +712,70 @@ function StatusSelect({ onChange, options, value }) {
   )
 }
 
+function AddToMoneyOption({
+  duplicateExpense,
+  itemType,
+  onChange,
+  status,
+  value,
+}) {
+  if (status !== 'paid') {
+    return null
+  }
+
+  if (duplicateExpense) {
+    return (
+      <p className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+        Expense already recorded in Money.
+      </p>
+    )
+  }
+
+  return (
+    <label className="flex items-start gap-3 rounded-xl bg-teal-50 px-3 py-3">
+      <input
+        type="checkbox"
+        checked={value !== 'no'}
+        onChange={(event) => onChange(event.target.checked ? 'yes' : 'no')}
+        className="mt-1 h-4 w-4 rounded border-stone-300 text-teal-700 focus:ring-teal-600"
+      />
+      <span>
+        <span className="block text-sm font-bold text-stone-900">
+          Add this payment to Money
+        </span>
+        <span className="mt-1 block text-xs leading-5 text-stone-500">
+          Creates a linked paid expense for this {itemType}.
+        </span>
+      </span>
+    </label>
+  )
+}
+
+function VendorSettlementSummary({ form }) {
+  const settlement = calculateVendorSettlement(form)
+
+  return (
+    <div className="grid grid-cols-3 gap-2 rounded-xl bg-white px-2 py-2 ring-1 ring-stone-200">
+      <MiniMetric label="Net due" value={settlement.netDue} />
+      <MiniMetric label="Paid" value={settlement.amountPaid} />
+      <MiniMetric label="Balance" value={settlement.balancePayable} />
+    </div>
+  )
+}
+
+function MiniMetric({ label, value }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-stone-500">
+        {label}
+      </p>
+      <p className="mt-1 text-xs font-bold text-stone-950">
+        {Number(value || 0).toLocaleString('en-IN')}
+      </p>
+    </div>
+  )
+}
+
 function validateForm(type, form) {
   const errors = {}
   const positiveAmount = (field, label = 'Amount') => {
@@ -528,8 +805,34 @@ function validateForm(type, form) {
   if (type === 'vendor') {
     if (!form.vendorName.trim()) errors.vendorName = 'Vendor is required.'
     if (!form.serviceType.trim()) errors.serviceType = 'Service is required.'
-    positiveAmount('monthlyAmount', 'Monthly amount')
     if (!form.paymentDate) errors.paymentDate = 'Payment date is required.'
+    if (!form.status) errors.status = 'Status is required.'
+
+    const amountFields = [
+      'usualAmount',
+      'amountDue',
+      'adjustmentAmount',
+      'advanceGiven',
+      'advanceAdjusted',
+      'balancePayable',
+      'amountPaid',
+    ]
+    amountFields.forEach((field) => {
+      if (form[field] !== '' && Number(form[field]) < 0) {
+        errors[field] = 'Amount cannot be negative.'
+      }
+    })
+
+    if (form.status === 'paid' && Number(form.amountPaid || 0) <= 0) {
+      errors.amountPaid = 'Paid amount must be positive.'
+    }
+
+    if (
+      form.status === 'unpaid' &&
+      Number(form.amountDue || form.usualAmount || form.monthlyAmount || 0) <= 0
+    ) {
+      errors.vendorAmount = 'Add due or usual amount.'
+    }
   }
 
   if (type === 'complaint') {
@@ -546,6 +849,15 @@ function validateForm(type, form) {
     positiveAmount('amount')
     if (!form.date) errors.date = 'Date is required.'
     if (!form.category) errors.category = 'Category is required.'
+    if (!form.status) errors.status = 'Status is required.'
+  }
+
+  if (type === 'income') {
+    if (!form.title.trim()) errors.title = 'Title is required.'
+    positiveAmount('amount')
+    if (!form.date) errors.date = 'Date is required.'
+    if (!form.category) errors.category = 'Category is required.'
+    if (!form.status) errors.status = 'Status is required.'
   }
 
   if (type === 'document') {
@@ -557,6 +869,15 @@ function validateForm(type, form) {
   }
 
   return errors
+}
+
+function getSaveOptions(type, form) {
+  return {
+    recordExpense:
+      ['bill', 'vendor'].includes(type) &&
+      form.status === 'paid' &&
+      form.addToMoney !== 'no',
+  }
 }
 
 function buildLifeItem(type, form) {
@@ -572,8 +893,10 @@ function buildLifeItem(type, form) {
   }
 
   if (type === 'bill') {
+    const { addToMoney, ...itemForm } = form
+
     return {
-      ...form,
+      ...itemForm,
       type,
       amount: toNumber(form.amount),
       frequency: form.frequency,
@@ -591,16 +914,33 @@ function buildLifeItem(type, form) {
   }
 
   if (type === 'vendor') {
+    const amountDue = toNumber(form.amountDue || form.usualAmount || form.monthlyAmount)
+    const amountPaid = toNumber(form.amountPaid)
+    const settlement = calculateVendorSettlement({
+      ...form,
+      amountDue,
+      amountPaid,
+    })
+    const balancePayable =
+      form.balancePayable === '' ? settlement.balancePayable : toNumber(form.balancePayable)
+
     return {
       ...form,
       type,
-      title: form.vendorName,
-      amount: toNumber(form.monthlyAmount),
-      monthlyAmount: toNumber(form.monthlyAmount),
+      title: `${form.vendorName} - ${form.serviceType}`,
+      amount: form.status === 'paid' ? amountPaid : amountDue,
+      usualAmount: toNumber(form.usualAmount || form.monthlyAmount),
+      monthlyAmount: toNumber(form.usualAmount || form.monthlyAmount),
+      paymentFrequency: form.paymentFrequency,
+      autoPay: form.autoPay === 'yes',
+      amountDue,
+      adjustmentAmount: toNumber(form.adjustmentAmount),
+      advanceAdjusted: toNumber(form.advanceAdjusted),
+      amountPaid,
       dueDate: form.paymentDate,
       advanceGiven: toNumber(form.advanceGiven),
-      balancePayable: toNumber(form.balancePayable),
-      category: form.serviceType,
+      balancePayable,
+      category: form.serviceType || 'Local Vendors',
     }
   }
 
@@ -622,6 +962,15 @@ function buildLifeItem(type, form) {
     }
   }
 
+  if (type === 'income') {
+    return {
+      ...form,
+      type,
+      amount: toNumber(form.amount),
+      recurring: form.recurring === 'yes',
+    }
+  }
+
   return {
     ...form,
     type,
@@ -632,7 +981,7 @@ function buildLifeItem(type, form) {
 
 function getInitialForm(type, initialItem) {
   if (!initialItem) {
-    return defaultValuesByType[type]
+    return getDefaultForm(type)
   }
 
   const baseForm = {
@@ -650,8 +999,12 @@ function getInitialForm(type, initialItem) {
   }
 
   if (type === 'bill') {
+    const duplicateExpense = hasExistingLinkedExpense(initialItem)
+
     return {
       ...baseForm,
+      addToMoney:
+        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
       frequency: normalizeOption(initialItem.frequency, 'monthly'),
     }
   }
@@ -665,11 +1018,30 @@ function getInitialForm(type, initialItem) {
   }
 
   if (type === 'vendor') {
+    const usualAmount = initialItem.usualAmount || initialItem.monthlyAmount || ''
+    const amountDue = initialItem.amountDue || initialItem.amount || initialItem.monthlyAmount || ''
+    const amountPaid =
+      initialItem.amountPaid || (initialItem.status === 'paid' ? initialItem.amount : '') || ''
+    const duplicateExpense = hasExistingLinkedExpense(initialItem)
+
     return {
       ...baseForm,
+      usualAmount,
       monthlyAmount: initialItem.monthlyAmount || initialItem.amount || '',
+      paymentFrequency: normalizeOption(initialItem.paymentFrequency, 'monthly'),
+      paymentMonth:
+        initialItem.paymentMonth ||
+        String(initialItem.paymentDate || initialItem.dueDate || today()).slice(0, 7),
+      paymentDate: initialItem.paymentDate || initialItem.dueDate || today(),
+      amountDue,
+      adjustmentAmount: initialItem.adjustmentAmount || '',
       advanceGiven: initialItem.advanceGiven || '',
+      advanceAdjusted: initialItem.advanceAdjusted || '',
+      amountPaid,
       balancePayable: initialItem.balancePayable || '',
+      autoPay: initialItem.autoPay ? 'yes' : 'no',
+      addToMoney:
+        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
     }
   }
 
@@ -680,7 +1052,56 @@ function getInitialForm(type, initialItem) {
     }
   }
 
+  if (type === 'income') {
+    return {
+      ...baseForm,
+      recurring: initialItem.recurring ? 'yes' : 'no',
+      frequency: normalizeOption(initialItem.frequency, 'monthly'),
+    }
+  }
+
   return baseForm
+}
+
+function getDefaultForm(type) {
+  const defaults = {
+    ...defaultValuesByType[type],
+  }
+
+  if (type === 'bill') {
+    return {
+      ...defaults,
+      dueDate: today(),
+    }
+  }
+
+  if (type === 'expense') {
+    return {
+      ...defaults,
+      date: today(),
+    }
+  }
+
+  if (type === 'income') {
+    return {
+      ...defaults,
+      date: today(),
+    }
+  }
+
+  if (type === 'vendor') {
+    return {
+      ...defaults,
+      paymentDate: today(),
+      paymentMonth: today().slice(0, 7),
+    }
+  }
+
+  return defaults
+}
+
+function hasExistingLinkedExpense(item) {
+  return item ? hasLinkedExpense(getLifeItems(), item) : false
 }
 
 function normalizeOption(value, fallback) {
