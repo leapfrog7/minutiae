@@ -7,6 +7,8 @@ import {
   formatAmount,
   formatCycleLabel,
   formatDisplayDate,
+  createTelLink,
+  createUpiPaymentLink,
   getQuickStatusAction,
   getRelevantDate,
   hasLinkedExpense,
@@ -28,6 +30,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   const [isEditing, setIsEditing] = useState(false)
   const [showPaidConfirm, setShowPaidConfirm] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [copiedValue, setCopiedValue] = useState('')
 
   useEffect(() => {
     function handleInternalBack(event) {
@@ -121,14 +124,25 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
     onItemDeleted(item.id)
   }
 
+  function handleCopy(value, label) {
+    if (!navigator.clipboard || !value) {
+      return
+    }
+
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedValue(label)
+      window.setTimeout(() => setCopiedValue(''), 1600)
+    })
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-20 bg-stone-950/30" onClick={onClose} />
       <aside
-        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20"
+        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20 md:inset-x-4 md:bottom-auto md:top-1/2 md:max-h-[86vh] md:max-w-2xl md:-translate-y-1/2 md:rounded-3xl md:p-5"
         aria-label="Item details"
       >
-        <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-stone-300" />
+        <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-stone-300 md:hidden" />
 
         {isEditing ? (
           <AddItemForm
@@ -170,7 +184,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
               )}
             </div>
 
-            <div className="mt-4 grid gap-2">
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
               <DetailRow label="Type" value={typeMeta.label} />
               <DetailRow label="Relevant date" value={formatDisplayDate(getRelevantDate(item))} />
               <DetailRow label="Category" value={item.category} />
@@ -181,7 +195,19 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
               ))}
             </div>
 
-            <div className="mt-4 grid gap-2">
+            {item.type === 'vendor' && (
+              <VendorPaymentActions
+                copiedValue={copiedValue}
+                item={item}
+                onCopy={handleCopy}
+              />
+            )}
+
+            {item.type === 'document' && item.contactNumber && (
+              <RecordContactActions item={item} />
+            )}
+
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
               {expenseRecorded && canRecordPaymentAsExpense(item) && (
                 <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
                   Expense recorded in Money.
@@ -191,7 +217,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
                 <button
                   type="button"
                   onClick={handleQuickAction}
-                  className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+                  className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white md:col-span-2"
                 >
                   {quickAction.label}
                 </button>
@@ -200,12 +226,12 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
                 <button
                   type="button"
                   onClick={handleRecordExpense}
-                  className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+                  className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white md:col-span-2"
                 >
-                  Record expense
+                  {item.type === 'document' ? 'Add to Money' : 'Record expense'}
                 </button>
               )}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 md:col-span-2">
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
@@ -244,6 +270,89 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
         />
       )}
     </>
+  )
+}
+
+function VendorPaymentActions({ copiedValue, item, onCopy }) {
+  const upiLink = createUpiPaymentLink(item)
+  const telLink = createTelLink(item.contactNumber)
+  const hasCopyActions = item.upiId || item.contactNumber
+
+  if (!upiLink && !telLink && !hasCopyActions) {
+    return null
+  }
+
+  return (
+    <section className="mt-4 rounded-2xl border border-teal-100 bg-white px-3 py-3">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">
+        Vendor actions
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {upiLink && (
+          <a
+            href={upiLink}
+            className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+          >
+            Pay with UPI
+          </a>
+        )}
+        {telLink && (
+          <a
+            href={telLink}
+            className="rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-white"
+          >
+            Call
+          </a>
+        )}
+        {item.upiId && (
+          <button
+            type="button"
+            onClick={() => onCopy(item.upiId, 'upi')}
+            className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-bold text-stone-800"
+          >
+            {copiedValue === 'upi' ? 'Copied' : 'Copy UPI'}
+          </button>
+        )}
+        {item.contactNumber && (
+          <button
+            type="button"
+            onClick={() => onCopy(item.contactNumber, 'number')}
+            className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-bold text-stone-800"
+          >
+            {copiedValue === 'number' ? 'Copied' : 'Copy number'}
+          </button>
+        )}
+      </div>
+      {(upiLink || telLink) && (
+        <p className="mt-3 text-xs leading-5 text-stone-500">
+          After payment, return to Minutiae and mark this as paid.
+        </p>
+      )}
+    </section>
+  )
+}
+
+function RecordContactActions({ item }) {
+  const telLink = createTelLink(item.contactNumber)
+
+  if (!telLink) {
+    return null
+  }
+
+  return (
+    <section className="mt-4 rounded-2xl border border-stone-200 bg-white px-3 py-3">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">
+        Contact
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a
+          href={telLink}
+          className="rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-white"
+        >
+          Call
+        </a>
+      </div>
+    </section>
   )
 }
 
@@ -325,10 +434,27 @@ function getSpecificRows(item) {
       ['Frequency', formatCycleLabel(item.frequency)],
     ],
     document: [
-      ['Document type', item.documentType],
+      ['Record type', item.recordType || item.documentType || 'Receipt'],
       ['Related to', item.relatedTo],
+      ['Amount', formatAmount(item.amount)],
+      ['Status', item.status],
       ['Document date', formatOptionalDate(item.documentDate)],
-      ['Expiry', formatOptionalDate(item.expiryDate)],
+      ['Service date', formatOptionalDate(item.serviceDate)],
+      [
+        'Next service due',
+        formatDateWithInterval(item.nextServiceDate, item.nextServiceInterval),
+      ],
+      ['Expiry', formatDateWithInterval(item.expiryDate, item.expiryInterval)],
+      [
+        'Warranty till',
+        formatDateWithInterval(item.warrantyTill, item.warrantyInterval),
+      ],
+      ['Service interval', formatCycleLabel(item.serviceInterval)],
+      ['Vendor/service person', item.vendorName],
+      ['Contact number', item.contactNumber],
+      ['Parts replaced', item.partsReplaced],
+      ['Reference number', item.referenceNumber],
+      ['Attachment note', item.attachmentNote],
     ],
   }
 
@@ -337,6 +463,27 @@ function getSpecificRows(item) {
 
 function formatOptionalDate(value) {
   return value ? formatDisplayDate(value) : ''
+}
+
+function formatDateWithInterval(dateValue, interval) {
+  const formattedDate = formatOptionalDate(dateValue)
+  const intervalLabel = getIntervalLabel(interval)
+
+  return [formattedDate, intervalLabel].filter(Boolean).join(' - ')
+}
+
+function getIntervalLabel(interval) {
+  const labels = {
+    '3m': '3 months',
+    '6m': '6 months',
+    '9m': '9 months',
+    '1y': '1 year',
+    '2y': '2 years',
+    '3y': '3 years',
+    '5y': '5 years',
+  }
+
+  return labels[interval] || ''
 }
 
 export default ItemDetailSheet

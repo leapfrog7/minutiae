@@ -30,7 +30,7 @@ function ConfirmDialog({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20 md:max-w-md">
         <h2 className="text-base font-bold text-stone-950">{title}</h2>
         <p className="mt-2 text-sm text-stone-600">{message}</p>
         <div className="mt-4 grid grid-cols-2 gap-2">

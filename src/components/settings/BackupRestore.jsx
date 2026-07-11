@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { itemTypes } from '../../data/itemTypes'
+import { exportLifeItemsBackup } from '../../features/backup/backupReminder'
 import {
-  getLifeItems,
   saveLifeItems,
 } from '../../features/lifeItems/lifeItemStorage'
 import ConfirmDialog from '../common/ConfirmDialog'
@@ -9,35 +9,18 @@ import SectionCard from '../common/SectionCard'
 
 const supportedTypes = new Set(itemTypes.map((item) => item.id))
 
-function BackupRestore({ onDataChanged }) {
+function BackupRestore({ onBackupExported, onDataChanged }) {
   const fileInputRef = useRef(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [pendingItems, setPendingItems] = useState(null)
 
   function handleExport() {
-    const items = getLifeItems()
-    const exportedAt = new Date().toISOString()
-    const payload = {
-      app: 'Minutiae',
-      version: '0.1.0',
-      exportedAt,
-      itemCount: items.length,
-      items,
-    }
-    const dateKey = exportedAt.slice(0, 10)
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
+    const result = exportLifeItemsBackup()
 
-    link.href = url
-    link.download = `minutiae-backup-${dateKey}.json`
-    link.click()
-    URL.revokeObjectURL(url)
     setError('')
-    setSuccess(`Exported ${items.length} items.`)
+    setSuccess('Backup exported. Next reminder in 15 days.')
+    onBackupExported?.(result)
   }
 
   function handleImportFile(event) {

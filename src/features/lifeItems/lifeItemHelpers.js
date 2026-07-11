@@ -1,7 +1,7 @@
 import { getItemTypeMeta } from '../../data/itemTypes'
 
-const inactiveStatuses = new Set(['paid', 'archived', 'resolved', 'closed'])
-const expenseSourceTypes = new Set(['bill', 'subscription', 'vendor', 'insurance'])
+const inactiveStatuses = new Set(['paid', 'completed', 'archived', 'resolved', 'closed'])
+const expenseSourceTypes = new Set(['bill', 'subscription', 'vendor', 'insurance', 'document'])
 
 const toDate = (value) => {
   if (!value) {
@@ -41,6 +41,13 @@ const monthKeyFromDateValue = (dateValue) => {
 }
 
 export function isCompletedItem(item) {
+  if (
+    item?.type === 'document' &&
+    (item.nextServiceDate || item.expiryDate || item.warrantyTill)
+  ) {
+    return item.status === 'closed'
+  }
+
   return inactiveStatuses.has(item.status)
 }
 
@@ -215,10 +222,43 @@ export function getRelevantDate(item) {
   }
 
   if (item.type === 'document') {
-    return item.expiryDate || item.documentDate || item.dueDate
+    return (
+      item.nextServiceDate ||
+      item.expiryDate ||
+      item.warrantyTill ||
+      item.documentDate ||
+      item.serviceDate ||
+      item.dueDate
+    )
   }
 
   return item.dueDate || item.date
+}
+
+export function getRelevantDateLabel(item) {
+  if (item?.type !== 'document') {
+    return ''
+  }
+
+  const relevantDate = getRelevantDate(item)
+
+  if (!relevantDate) {
+    return ''
+  }
+
+  if (item.nextServiceDate === relevantDate) {
+    return 'Service due'
+  }
+
+  if (item.expiryDate === relevantDate) {
+    return 'Expiry due'
+  }
+
+  if (item.warrantyTill === relevantDate) {
+    return 'Warranty ending'
+  }
+
+  return ''
 }
 
 export function getQuickStatusAction(item) {
@@ -256,7 +296,7 @@ export function getQuickStatusAction(item) {
   }
 
   if (item.type === 'document' && item.status === 'pending') {
-    return { label: 'Mark Closed', status: 'closed' }
+    return { label: 'Mark Completed', status: 'completed' }
   }
 
   return null
@@ -289,6 +329,7 @@ export function getItemAmount(item) {
 export function getExpenseCategoryForSourceItem(item) {
   const categoryByType = {
     bill: item.category || 'Bills',
+    document: getDocumentExpenseCategory(item),
     insurance: 'Insurance',
     subscription: 'Subscription',
     vendor: item.serviceType || 'Local Vendors',
@@ -304,9 +345,15 @@ export function hasLinkedExpense(items, sourceItem) {
 }
 
 export function shouldOfferRecordExpense(item, items) {
+  const statusCanCreateExpense =
+    item?.type === 'document'
+      ? ['paid', 'completed'].includes(item.status)
+      : item?.status === 'paid'
+
   return (
     isExpenseSourceType(item) &&
-    item.status === 'paid' &&
+    statusCanCreateExpense &&
+    getItemAmount(item) > 0 &&
     !hasLinkedExpense(items, item)
   )
 }
@@ -322,11 +369,16 @@ export function createExpenseFromSourceItem(sourceItem, dateOverride) {
       : sourceItem.title
   const date =
     dateOverride ||
+    (sourceItem.type === 'document'
+      ? sourceItem.serviceDate || sourceItem.documentDate || ''
+      : '') ||
     (sourceItem.type === 'vendor' ? sourceItem.paidDate || sourceItem.paymentDate : '') ||
     getDateInputValue()
   const notes =
     sourceItem.type === 'vendor'
       ? `Recorded from paid vendor payment: ${title}`
+      : sourceItem.type === 'document'
+        ? `Recorded from record/maintenance: ${title}`
       : `Recorded from paid ${sourceItem.type}: ${title}`
 
   return {
@@ -338,7 +390,9 @@ export function createExpenseFromSourceItem(sourceItem, dateOverride) {
     category: getExpenseCategoryForSourceItem(sourceItem),
     paymentMode: sourceItem.paymentMode || '',
     recurring:
-      sourceItem.type === 'vendor'
+      sourceItem.type === 'document'
+        ? false
+        : sourceItem.type === 'vendor'
         ? ['monthly', 'weekly'].includes(sourceItem.paymentFrequency)
         : sourceItem.type !== 'bill',
     notes,
@@ -369,6 +423,70 @@ export function getVendorTitle(item) {
   const vendorName = item.vendorName || item.title || 'Vendor'
   const serviceType = item.serviceType || item.category || 'Local Vendors'
   return `${vendorName} - ${serviceType}`
+}
+
+function getDocumentExpenseCategory(item) {
+  if (['Service / Maintenance', 'Repair', 'AMC'].includes(item.recordType)) {
+    return 'Household'
+  }
+
+  if (item.recordType === 'Tax Receipt') {
+    return 'House Tax'
+  }
+
+  if (item.recordType === 'Insurance Document') {
+    return 'Insurance'
+  }
+
+  return item.category || 'Miscellaneous'
+}
+
+export function getVendorPaymentAmount(item) {
+  return Number(
+    item?.amountPaid ||
+      item?.amountDue ||
+      item?.usualAmount ||
+      item?.amount ||
+      item?.monthlyAmount ||
+      0,
+  )
+}
+
+export function createUpiPaymentLink(item) {
+  const upiId = String(item?.upiId || '').trim()
+
+  if (!upiId) {
+    return ''
+  }
+
+  const amount = getVendorPaymentAmount(item)
+  const params = new URLSearchParams({
+    pa: upiId,
+    pn: item?.vendorName || item?.title || 'Vendor',
+    cu: 'INR',
+  })
+
+  if (amount > 0) {
+    params.set('am', String(amount))
+  }
+
+  return `upi://pay?${params.toString()}`
+}
+
+export function createTelLink(contactNumber) {
+  const trimmedNumber = String(contactNumber || '').trim()
+
+  if (!trimmedNumber) {
+    return ''
+  }
+
+  const startsWithPlus = trimmedNumber.startsWith('+')
+  const digitsAndPlus = trimmedNumber.replace(/[^\d+]/g, '')
+  const number = startsWithPlus
+    ? `+${digitsAndPlus.replace(/\+/g, '')}`
+    : digitsAndPlus.replace(/\+/g, '')
+
+  return number ? `tel:${number}` : ''
 }
 
 export function getDateInputValue(date = new Date()) {
@@ -529,8 +647,9 @@ export function getUpcomingRenewals(items, days = 30) {
     items.filter((item) => {
       const isRenewal =
         item.type === 'subscription' ||
-        item.type === 'document' ||
-        item.type === 'insurance'
+        item.type === 'insurance' ||
+        (item.type === 'document' &&
+          Boolean(item.nextServiceDate || item.expiryDate || item.warrantyTill))
       const itemDate = toDate(getRelevantDate(item))
       return isRenewal && itemDate && isActive(item) && itemDate >= today && itemDate <= endDate
     }),
@@ -549,7 +668,7 @@ export function isPaidExpense(item) {
   return (
     item.type === 'expense' &&
     Number(item.amount) > 0 &&
-    (!item.status || item.status === 'paid')
+    item.status === 'paid'
   )
 }
 
@@ -594,7 +713,7 @@ export function isIncomeItem(item) {
 }
 
 export function isReceivedIncome(item) {
-  return isIncomeItem(item) && (!item.status || item.status === 'received')
+  return isIncomeItem(item) && item.status === 'received'
 }
 
 export function isExpectedIncome(item) {

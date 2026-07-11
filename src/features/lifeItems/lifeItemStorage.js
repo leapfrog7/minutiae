@@ -2,6 +2,7 @@ import {
   createExpenseFromSourceItem,
   getDateInputValue,
   hasLinkedExpense,
+  shouldOfferRecordExpense,
 } from './lifeItemHelpers'
 
 const STORAGE_KEY = 'minutiae-life-items'
@@ -314,6 +315,52 @@ const createSampleLifeItems = () => {
     ),
     withTimestamps(
       {
+        id: 'sample-ro-filter',
+        type: 'document',
+        title: 'RO filter changed',
+        amount: 1850,
+        status: 'completed',
+        paymentMode: 'UPI',
+        category: 'Household',
+        recordType: 'Service / Maintenance',
+        documentType: 'Service / Maintenance',
+        relatedTo: 'Aquaguard RO',
+        serviceDate: addDays(-20),
+        nextServiceDate: addDays(160),
+        serviceInterval: 'six_monthly',
+        vendorName: 'RO service person',
+        contactNumber: '9876501234',
+        partsReplaced: 'RO filter kit',
+        referenceNumber: 'RO-JOB-1024',
+        attachmentNote: 'WhatsApp with RO service person',
+        notes: 'Next filter change due in about six months.',
+      },
+      now,
+    ),
+    withTimestamps(
+      {
+        id: 'sample-bedroom-ac-service',
+        type: 'document',
+        title: 'Bedroom AC service',
+        amount: 1200,
+        status: 'completed',
+        paymentMode: 'Cash',
+        category: 'Household',
+        recordType: 'Service / Maintenance',
+        documentType: 'Service / Maintenance',
+        relatedTo: 'Bedroom AC',
+        serviceDate: addDays(-35),
+        nextServiceDate: addDays(150),
+        serviceInterval: 'six_monthly',
+        vendorName: 'AC technician',
+        partsReplaced: 'General service and cleaning',
+        referenceNumber: 'AC-SVC-338',
+        notes: 'Cooling improved after service.',
+      },
+      now,
+    ),
+    withTimestamps(
+      {
         id: 'sample-house-tax',
         type: 'document',
         title: 'House tax receipt',
@@ -323,10 +370,13 @@ const createSampleLifeItems = () => {
         status: 'paid',
         paymentMode: 'Bank Transfer',
         category: 'House Tax',
-        documentType: 'Receipt',
+        recordType: 'Tax Receipt',
+        documentType: 'Tax Receipt',
         relatedTo: 'Municipal corporation',
         documentDate: addDays(-10),
         expiryDate: addDays(355),
+        referenceNumber: 'MCD-TAX-2026',
+        attachmentNote: 'Email PDF',
         notes: 'Receipt metadata saved; upload later.',
       },
       now,
@@ -371,7 +421,7 @@ export function addLifeItemWithLinkedExpense(item, { recordExpense = false } = {
     timestamp,
   )
   const expenseDraft =
-    recordExpense && nextItem.status === 'paid'
+    recordExpense && shouldOfferRecordExpense(nextItem, [])
       ? createExpenseFromSourceItem(nextItem, paidDate)
       : null
   const expenseItem = expenseDraft ? withTimestamps(expenseDraft, timestamp) : null
@@ -420,8 +470,13 @@ export function updateLifeItemWithLinkedExpense(
   })
   const duplicateExpense = updatedItem ? hasLinkedExpense(currentItems, updatedItem) : false
   const expenseDraft =
-    recordExpense && updatedItem?.status === 'paid' && !duplicateExpense
-      ? createExpenseFromSourceItem(updatedItem, updatedItem.paidDate || getDateInputValue())
+    recordExpense && updatedItem && !duplicateExpense && shouldOfferRecordExpense(updatedItem, currentItems)
+      ? createExpenseFromSourceItem(
+          updatedItem,
+          updatedItem.type === 'document'
+            ? undefined
+            : updatedItem.paidDate || getDateInputValue(),
+        )
       : null
   const expenseItem = expenseDraft ? withTimestamps(expenseDraft, timestamp) : null
 

@@ -53,7 +53,10 @@ function AddPage({ initialType = '', onNavigate }) {
           description="This item is now available in Records and will show up in Calendar or Money where relevant."
         />
 
-        <SectionCard title={`${typeMeta.emoji} ${savedItem.title}`}>
+        <SectionCard
+          title={`${typeMeta.emoji} ${savedItem.title}`}
+          className="md:mx-auto md:max-w-xl"
+        >
           <p className="text-sm text-stone-600">Saved to Minutiae</p>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
@@ -79,12 +82,12 @@ function AddPage({ initialType = '', onNavigate }) {
   return (
     <>
       <AppHeader
-        title="Add"
+        title={selectedType ? 'Add' : 'What do you want to add?'}
         eyebrow="Capture a household item"
         description={
           selectedType
             ? 'Add just enough detail to make this easy to find and follow up.'
-            : 'Choose what you want to track.'
+            : 'Add expenses, bills, vendor payments, income, renewals or records.'
         }
       />
 
@@ -96,15 +99,7 @@ function AddPage({ initialType = '', onNavigate }) {
         />
       ) : (
         <AddItemTypeSelector
-          itemTypes={itemTypes.map((item) => ({
-            ...item,
-            label:
-              item.id === 'complaint'
-                ? 'Complaint'
-                : item.id === 'document'
-                  ? 'Document'
-                  : item.label,
-          }))}
+          itemTypes={itemTypes}
           onSelectType={setSelectedType}
         />
       )}

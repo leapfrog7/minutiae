@@ -29,10 +29,10 @@ function SummaryPreviewSheet({
     <>
       <div className="fixed inset-0 z-20 bg-stone-950/30" onClick={onClose} />
       <aside
-        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[82vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20"
+        className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[82vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20 md:inset-x-4 md:bottom-auto md:top-1/2 md:max-h-[82vh] md:max-w-xl md:-translate-y-1/2 md:rounded-3xl md:p-5"
         aria-label={title}
       >
-        <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-stone-300" />
+        <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-stone-300 md:hidden" />
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">
@@ -52,7 +52,7 @@ function SummaryPreviewSheet({
           </button>
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 grid gap-2">
           {items.length > 0 ? (
             items.map((item) => (
               <ItemCard key={item.id} item={item} onOpen={onOpenItem} />

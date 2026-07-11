@@ -2,7 +2,7 @@ import ItemTypeCard from './ItemTypeCard'
 
 function AddItemTypeSelector({ itemTypes, onSelectType }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
       {itemTypes.map((item) => (
         <ItemTypeCard
           key={item.id}

@@ -1,51 +1,64 @@
+export const itemTypeEmojis = {
+  bill: '\u{1F9FE}',
+  complaint: '\u{1F6E0}\uFE0F',
+  document: '\u{1F9F0}',
+  expense: '\u{1F4B8}',
+  income: '\u{1F4B0}',
+  insurance: '\u{1F6E1}\uFE0F',
+  subscription: '\u{1F501}',
+  vendor: '\u{1F464}',
+}
+
+export const fallbackItemEmoji = '\u2795'
+
 export const itemTypes = [
   {
-    id: 'subscription',
-    label: 'Subscription',
-    emoji: '🔁',
-    description: 'OTT, cloud, apps, memberships, and auto-renewals.',
+    id: 'expense',
+    label: 'Expense',
+    emoji: itemTypeEmojis.expense,
+    description: 'Daily spending or one-time payment',
   },
   {
     id: 'bill',
     label: 'Bill',
-    emoji: '🧾',
-    description: 'Electricity, gas, water, mobile, broadband, and taxes.',
+    emoji: itemTypeEmojis.bill,
+    description: 'Electricity, gas, water, EMI, tax or dues',
   },
   {
     id: 'vendor',
     label: 'Vendor Payment',
-    emoji: '🤝',
-    description: 'Household helpers, society vendors, tutors, and local services.',
+    emoji: itemTypeEmojis.vendor,
+    description: 'Maid, milkman, ironing, cook or local service',
   },
   {
-    id: 'insurance',
-    label: 'Insurance',
-    emoji: '🛡️',
-    description: 'Premiums, policies, renewal dates, and insurer details.',
-  },
-  {
-    id: 'complaint',
-    label: 'Complaint / Service Request',
-    emoji: '🛠️',
-    description: 'Track complaint IDs, service visits, and follow-ups.',
-  },
-  {
-    id: 'expense',
-    label: 'Expense',
-    emoji: '💸',
-    description: 'Small spends and one-time household purchases.',
+    id: 'subscription',
+    label: 'Subscription',
+    emoji: itemTypeEmojis.subscription,
+    description: 'Fixed renewals like OTT, cloud or apps',
   },
   {
     id: 'income',
     label: 'Income',
-    emoji: '💰',
-    description: 'Salary, refunds, rent, interest, and other money in.',
+    emoji: itemTypeEmojis.income,
+    description: 'Salary or other money received',
+  },
+  {
+    id: 'insurance',
+    label: 'Insurance',
+    emoji: itemTypeEmojis.insurance,
+    description: 'Premium due or paid',
+  },
+  {
+    id: 'complaint',
+    label: 'Complaint',
+    emoji: itemTypeEmojis.complaint,
+    description: 'Service request or follow-up',
   },
   {
     id: 'document',
-    label: 'Document / Receipt',
-    emoji: '📄',
-    description: 'Receipts, warranties, policies, IDs, and renewals.',
+    label: 'Record / Maintenance',
+    emoji: itemTypeEmojis.document,
+    description: 'Receipts, warranties, repairs, servicing or expiry reminders',
   },
 ]
 
@@ -53,5 +66,5 @@ export const getItemTypeMeta = (type) =>
   itemTypes.find((itemType) => itemType.id === type) ?? {
     id: type,
     label: type,
-    emoji: '•',
+    emoji: fallbackItemEmoji,
   }

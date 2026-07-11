@@ -1,8 +1,8 @@
-const navItems = [
+export const navItems = [
   {
     id: 'home',
     label: 'Home',
-    icon: '🏠',
+    icon: '\u{1F3E0}',
   },
   {
     id: 'add',
@@ -12,24 +12,24 @@ const navItems = [
   {
     id: 'calendar',
     label: 'Calendar',
-    icon: '📅',
+    icon: '\u{1F4C5}',
   },
   {
     id: 'money',
     label: 'Money',
-    icon: '₹',
+    icon: '\u20B9',
   },
   {
     id: 'records',
     label: 'Records',
-    icon: '📁',
+    icon: '\u{1F4C1}',
   },
 ]
 
 function BottomNav({ activePage, onNavigate }) {
   return (
     <nav
-      className="fixed bottom-0 left-1/2 z-10 w-full max-w-md -translate-x-1/2 border-t border-stone-200 bg-white/95 px-3 pb-3 pt-2 shadow-[0_-12px_30px_rgba(41,37,36,0.08)] backdrop-blur"
+      className="fixed bottom-0 left-1/2 z-10 w-full max-w-md -translate-x-1/2 border-t border-stone-200 bg-white/95 px-3 pb-3 pt-2 shadow-[0_-12px_30px_rgba(41,37,36,0.08)] backdrop-blur lg:hidden"
       aria-label="Main navigation"
     >
       <div className="grid grid-cols-5 gap-1">
@@ -50,7 +50,7 @@ function BottomNav({ activePage, onNavigate }) {
               aria-label={item.label}
             >
               <span
-                className={`flex h-5 items-center justify-center leading-none ${
+                className={`flex h-5 items-center justify-center ${
                   item.id === 'add' ? 'text-lg font-bold' : 'text-lg'
                 }`}
                 aria-hidden="true"

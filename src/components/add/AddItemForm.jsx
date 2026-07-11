@@ -110,11 +110,27 @@ const defaultValuesByType = {
   },
   document: {
     title: '',
+    recordType: 'Receipt',
     documentType: '',
     relatedTo: '',
+    amount: '',
     documentDate: today(),
+    serviceDate: today(),
+    nextServiceInterval: 'none',
+    nextServiceDate: '',
+    expiryInterval: 'none',
     expiryDate: '',
-    category: 'Document',
+    warrantyInterval: 'none',
+    warrantyTill: '',
+    vendorName: '',
+    contactNumber: '',
+    serviceInterval: 'one_time',
+    partsReplaced: '',
+    referenceNumber: '',
+    attachmentNote: '',
+    addToMoney: 'yes',
+    paymentMode: 'UPI',
+    category: 'Miscellaneous',
     status: 'pending',
     notes: '',
   },
@@ -128,7 +144,7 @@ const statusOptionsByType = {
   complaint: ['open', 'followed_up', 'resolved', 'closed'],
   expense: ['paid', 'unpaid'],
   income: ['received', 'expected'],
-  document: ['pending', 'closed'],
+  document: ['pending', 'completed', 'paid', 'closed'],
 }
 
 const frequencyOptions = [
@@ -166,12 +182,40 @@ const vendorServiceTypes = [
   'Appliance Repair',
   'Other',
 ]
-
+const recordTypeOptions = [
+  'Receipt',
+  'Warranty',
+  'Service / Maintenance',
+  'Repair',
+  'AMC',
+  'Tax Receipt',
+  'Insurance Document',
+  'Complaint Proof',
+  'Other',
+]
+const serviceIntervalOptions = [
+  { value: 'one_time', label: 'One-time' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'six_monthly', label: 'Six-monthly' },
+  { value: 'yearly', label: 'Yearly' },
+  { value: 'custom', label: 'Custom' },
+]
+const reminderIntervalOptions = [
+  { value: 'none', label: 'Not needed' },
+  { value: '3m', label: '3m' },
+  { value: '6m', label: '6m' },
+  { value: '9m', label: '9m' },
+  { value: '1y', label: '1y' },
+  { value: '2y', label: '2y' },
+  { value: '3y', label: '3y' },
+  { value: '5y', label: '5y' },
+]
 const toNumber = (value) => (value === '' ? 0 : Number(value))
 
-function Field({ children, error, label }) {
+function Field({ children, className = '', error, label }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`}>
       <span className="text-xs font-semibold text-stone-700">{label}</span>
       <div className="mt-1">{children}</div>
       {error && <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
@@ -236,6 +280,10 @@ function AddItemForm({
         }
       }
 
+      if (selectedType === 'document') {
+        return recalculateDocumentReminderDates(nextForm, field)
+      }
+
       return nextForm
     })
   }
@@ -256,7 +304,7 @@ function AddItemForm({
   const showError = (field) => (submitted ? errors[field] : '')
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/60">
+    <form onSubmit={handleSubmit} className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm shadow-stone-200/60 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
@@ -275,7 +323,7 @@ function AddItemForm({
         </button>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-3 md:grid-cols-2">
         {selectedType === 'subscription' && (
           <>
             <Field label="Title" error={showError('title')}>
@@ -588,41 +636,107 @@ function AddItemForm({
 
         {selectedType === 'document' && (
           <>
-            <Field label="Title" error={showError('title')}>
-              <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="House tax receipt" />
-            </Field>
-            <Field label="Document type" error={showError('documentType')}>
-              <TextInput value={form.documentType} onChange={(event) => updateField('documentType', event.target.value)} placeholder="Receipt, warranty, policy" />
-            </Field>
-            <Field label="Related to">
-              <TextInput value={form.relatedTo} onChange={(event) => updateField('relatedTo', event.target.value)} />
-            </Field>
-            <TwoFields>
-              <Field label="Doc date" error={showError('documentDateGroup')}>
-                <TextInput type="date" value={form.documentDate} onChange={(event) => updateField('documentDate', event.target.value)} />
+            <FormGroup title="Record details">
+              <Field label="Title" error={showError('title')}>
+                <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="RO filter changed" />
               </Field>
-              <Field label="Expiry" error={showError('documentDateGroup')}>
-                <TextInput type="date" value={form.expiryDate} onChange={(event) => updateField('expiryDate', event.target.value)} />
+              <Field label="Record type">
+                <SelectInput value={form.recordType} onChange={(event) => updateField('recordType', event.target.value)}>
+                  {recordTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </SelectInput>
               </Field>
-            </TwoFields>
-            <TwoFields>
+              <Field label="Related to">
+                <TextInput value={form.relatedTo} onChange={(event) => updateField('relatedTo', event.target.value)} placeholder="Aquaguard RO, Bedroom AC" />
+              </Field>
               <Field label="Category">
                 <CategorySelect value={form.category} onChange={(value) => updateField('category', value)} />
+              </Field>
+              <Field label="Reference number">
+                <TextInput value={form.referenceNumber} onChange={(event) => updateField('referenceNumber', event.target.value)} placeholder="Invoice, job card, complaint no." />
               </Field>
               <Field label="Status">
                 <StatusSelect value={form.status} options={statusOptions} onChange={(value) => updateField('status', value)} />
               </Field>
-            </TwoFields>
+            </FormGroup>
+
+            <FormGroup title="Dates & reminders">
+              <TwoFields>
+                <Field label="Document date" error={showError('documentDateGroup')}>
+                  <TextInput type="date" value={form.documentDate} onChange={(event) => updateField('documentDate', event.target.value)} />
+                </Field>
+                <Field label="Service date" error={showError('documentDateGroup')}>
+                  <TextInput type="date" value={form.serviceDate} onChange={(event) => updateField('serviceDate', event.target.value)} />
+                </Field>
+              </TwoFields>
+              <ReminderIntervalControl
+                date={form.nextServiceDate}
+                interval={form.nextServiceInterval}
+                label="Next service due"
+                previewLabel="Due"
+                onChange={(value) => updateField('nextServiceInterval', value)}
+              />
+              <ReminderIntervalControl
+                date={form.warrantyTill}
+                interval={form.warrantyInterval}
+                label="Warranty expires"
+                previewLabel="Expires"
+                onChange={(value) => updateField('warrantyInterval', value)}
+              />
+              <ReminderIntervalControl
+                date={form.expiryDate}
+                interval={form.expiryInterval}
+                label="Expiry / next due"
+                previewLabel="Date"
+                onChange={(value) => updateField('expiryInterval', value)}
+              />
+            </FormGroup>
+
+            <FormGroup title="Service / vendor details">
+              <Field label="Vendor / service person">
+                <TextInput value={form.vendorName} onChange={(event) => updateField('vendorName', event.target.value)} />
+              </Field>
+              <Field label="Contact number">
+                <TextInput type="tel" value={form.contactNumber} onChange={(event) => updateField('contactNumber', event.target.value)} />
+              </Field>
+              <Field label="Service interval">
+                <SelectInput value={form.serviceInterval} onChange={(event) => updateField('serviceInterval', event.target.value)}>
+                  {serviceIntervalOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </SelectInput>
+              </Field>
+              <Field label="Parts replaced">
+                <TextInput value={form.partsReplaced} onChange={(event) => updateField('partsReplaced', event.target.value)} placeholder="RO filter kit, AC capacitor" />
+              </Field>
+            </FormGroup>
+
+            <FormGroup title="Payment details">
+              <Field label="Amount">
+                <TextInput type="number" min="0" inputMode="decimal" value={form.amount} onChange={(event) => updateField('amount', event.target.value)} />
+              </Field>
+              <Field label="Payment">
+                <PaymentSelect value={form.paymentMode} onChange={(value) => updateField('paymentMode', value)} />
+              </Field>
+              <Field label="Attachment note" className="md:col-span-2">
+                <TextInput value={form.attachmentNote} onChange={(event) => updateField('attachmentNote', event.target.value)} placeholder="WhatsApp, Google Photos, email PDF" />
+              </Field>
+              <AddToMoneyOption
+                amount={form.amount}
+                duplicateExpense={hasExistingLinkedExpense(initialItem)}
+                itemType="record"
+                status={form.status}
+                value={form.addToMoney}
+                onChange={(value) => updateField('addToMoney', value)}
+              />
+            </FormGroup>
           </>
         )}
 
-        <Field label="Notes">
+        <Field label="Notes" className="md:col-span-2">
           <TextInput as="textarea" rows="3" value={form.notes} onChange={(event) => updateField('notes', event.target.value)} placeholder="Anything useful to remember" />
         </Field>
 
         <button
           type="submit"
-          className="mt-1 rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white shadow-sm shadow-teal-900/20 disabled:bg-stone-300"
+          className="mt-1 rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white shadow-sm shadow-teal-900/20 disabled:bg-stone-300 md:col-span-2 md:justify-self-end md:px-8"
         >
           {mode === 'edit' ? 'Save changes' : 'Save item'}
         </button>
@@ -632,17 +746,63 @@ function AddItemForm({
 }
 
 function TwoFields({ children }) {
-  return <div className="grid grid-cols-2 gap-2">{children}</div>
+  return <div className="grid gap-2 sm:grid-cols-2 md:contents">{children}</div>
 }
 
 function FormGroup({ children, title }) {
   return (
-    <section className="grid gap-3 rounded-xl bg-stone-50 px-3 py-3">
-      <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-stone-500">
+    <section className="grid gap-3 rounded-xl bg-stone-50 px-3 py-3 md:col-span-2 md:grid-cols-2">
+      <h3 className="text-xs font-bold uppercase tracking-[0.1em] text-stone-500 md:col-span-2">
         {title}
       </h3>
       {children}
     </section>
+  )
+}
+
+function ReminderIntervalControl({
+  date,
+  interval,
+  label,
+  onChange,
+  previewLabel,
+}) {
+  return (
+    <div className="md:col-span-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold text-stone-700">{label}</p>
+        {date && (
+          <p className="shrink-0 text-xs font-semibold text-teal-700">
+            {previewLabel}: {formatDatePreview(date)}
+          </p>
+        )}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {reminderIntervalOptions.map((option) => {
+          const isActive = interval === option.value
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={`min-w-0 rounded-full px-3 py-2 text-xs font-bold ${
+                isActive
+                  ? 'bg-teal-700 text-white'
+                  : 'bg-white text-stone-600 ring-1 ring-stone-200'
+              }`}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+      {!date && (
+        <p className="mt-1 text-xs leading-5 text-stone-500">
+          No reminder date selected.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -671,6 +831,89 @@ function CommonMoneyFields({
       </Field>
     </>
   )
+}
+
+function recalculateDocumentReminderDates(form, changedField) {
+  const shouldRecalculate =
+    [
+      'documentDate',
+      'serviceDate',
+      'nextServiceInterval',
+      'warrantyInterval',
+      'expiryInterval',
+    ].includes(changedField)
+
+  if (!shouldRecalculate) {
+    return form
+  }
+
+  return {
+    ...form,
+    nextServiceDate: calculateReminderDate(
+      form.serviceDate || form.documentDate || today(),
+      form.nextServiceInterval,
+    ),
+    warrantyTill: calculateReminderDate(
+      form.serviceDate || form.documentDate || today(),
+      form.warrantyInterval,
+    ),
+    expiryDate: calculateReminderDate(
+      form.documentDate || form.serviceDate || today(),
+      form.expiryInterval,
+    ),
+  }
+}
+
+function calculateReminderDate(baseDate, interval) {
+  if (!baseDate || !interval || interval === 'none') {
+    return ''
+  }
+
+  return addIntervalToDate(baseDate, interval)
+}
+
+function addIntervalToDate(dateString, interval) {
+  const date = new Date(`${dateString}T00:00:00`)
+
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const intervalMatch = /^(\d+)([my])$/.exec(interval)
+
+  if (!intervalMatch) {
+    return ''
+  }
+
+  const amount = Number(intervalMatch[1])
+  const unit = intervalMatch[2]
+  const originalDay = date.getDate()
+
+  if (unit === 'm') {
+    const targetMonth = date.getMonth() + amount
+    date.setDate(1)
+    date.setMonth(targetMonth)
+    const lastDayOfTargetMonth = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0,
+    ).getDate()
+    date.setDate(Math.min(originalDay, lastDayOfTargetMonth))
+  }
+
+  if (unit === 'y') {
+    date.setFullYear(date.getFullYear() + amount)
+  }
+
+  return date.toISOString().slice(0, 10)
+}
+
+function formatDatePreview(dateString) {
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(`${dateString}T00:00:00`))
 }
 
 function CategorySelect({ onChange, options = indiaFirstCategories, value }) {
@@ -713,13 +956,17 @@ function StatusSelect({ onChange, options, value }) {
 }
 
 function AddToMoneyOption({
+  amount,
   duplicateExpense,
   itemType,
   onChange,
   status,
   value,
 }) {
-  if (status !== 'paid') {
+  if (
+    !['paid', 'completed'].includes(status) ||
+    (amount !== undefined && Number(amount || 0) <= 0)
+  ) {
     return null
   }
 
@@ -862,9 +1109,17 @@ function validateForm(type, form) {
 
   if (type === 'document') {
     if (!form.title.trim()) errors.title = 'Title is required.'
-    if (!form.documentType.trim()) errors.documentType = 'Document type is required.'
-    if (!form.documentDate && !form.expiryDate) {
-      errors.documentDateGroup = 'Add document date or expiry.'
+    if (
+      !form.documentDate &&
+      !form.serviceDate &&
+      !form.nextServiceDate &&
+      !form.expiryDate &&
+      !form.warrantyTill
+    ) {
+      errors.documentDateGroup = 'Add at least one date.'
+    }
+    if (form.amount !== '' && Number(form.amount) < 0) {
+      errors.amount = 'Amount cannot be negative.'
     }
   }
 
@@ -874,8 +1129,10 @@ function validateForm(type, form) {
 function getSaveOptions(type, form) {
   return {
     recordExpense:
-      ['bill', 'vendor'].includes(type) &&
-      form.status === 'paid' &&
+      ((['bill', 'vendor'].includes(type) && form.status === 'paid') ||
+        (type === 'document' &&
+          ['paid', 'completed'].includes(form.status) &&
+          Number(form.amount || 0) > 0)) &&
       form.addToMoney !== 'no',
   }
 }
@@ -971,6 +1228,25 @@ function buildLifeItem(type, form) {
     }
   }
 
+  if (type === 'document') {
+    const recordType = form.recordType || form.documentType || 'Receipt'
+
+    return {
+      ...form,
+      type,
+      recordType,
+      documentType: recordType,
+      amount: toNumber(form.amount),
+      dueDate:
+        form.nextServiceDate ||
+        form.expiryDate ||
+        form.warrantyTill ||
+        form.documentDate ||
+        form.serviceDate ||
+        '',
+    }
+  }
+
   return {
     ...form,
     type,
@@ -1057,6 +1333,31 @@ function getInitialForm(type, initialItem) {
       ...baseForm,
       recurring: initialItem.recurring ? 'yes' : 'no',
       frequency: normalizeOption(initialItem.frequency, 'monthly'),
+    }
+  }
+
+  if (type === 'document') {
+    const recordType = initialItem.recordType || initialItem.documentType || 'Receipt'
+    const duplicateExpense = hasExistingLinkedExpense(initialItem)
+
+    return {
+      ...baseForm,
+      recordType,
+      documentType: recordType,
+      amount: initialItem.amount || '',
+      documentDate: initialItem.documentDate || '',
+      serviceDate: initialItem.serviceDate || '',
+      nextServiceInterval: initialItem.nextServiceInterval || 'none',
+      nextServiceDate: initialItem.nextServiceDate || '',
+      expiryInterval: initialItem.expiryInterval || 'none',
+      expiryDate: initialItem.expiryDate || '',
+      warrantyInterval: initialItem.warrantyInterval || 'none',
+      warrantyTill: initialItem.warrantyTill || '',
+      serviceInterval: normalizeOption(initialItem.serviceInterval, 'one_time'),
+      addToMoney:
+        ['paid', 'completed'].includes(initialItem.status) && !duplicateExpense
+          ? 'yes'
+          : 'no',
     }
   }
 

@@ -26,7 +26,10 @@ function ItemCard({ dateLabel, framed = true, item, onOpen, showStatus = true })
           : ''
       }`}
     >
-      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-lg">
+      <span
+        aria-hidden="true"
+        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-lg"
+      >
         {getItemEmoji(item)}
       </span>
       <div className="min-w-0 flex-1">
@@ -94,6 +97,10 @@ function getSubtitle(item, dateLabel) {
     return `${item.category || 'Income'} - ${dateLabel}`
   }
 
+  if (item.type === 'document') {
+    return `${item.recordType || item.documentType || 'Record'} - ${dateLabel}`
+  }
+
   return `${getItemTypeLabel(item.type)} - ${dateLabel}`
 }
 
@@ -101,6 +108,17 @@ function getDetail(item) {
   if (item.type !== 'vendor') {
     if (item.type === 'income') {
       return item.sourceName || item.category || ''
+    }
+
+    if (item.type === 'document') {
+      return (
+        item.relatedTo ||
+        item.vendorName ||
+        item.referenceNumber ||
+        item.partsReplaced ||
+        item.attachmentNote ||
+        ''
+      )
     }
 
     return ''

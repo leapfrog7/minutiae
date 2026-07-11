@@ -12,6 +12,7 @@ const searchableFields = [
   'title',
   'category',
   'notes',
+  'recordType',
   'vendorName',
   'serviceType',
   'contactNumber',
@@ -20,6 +21,10 @@ const searchableFields = [
   'complaintId',
   'companyOrDepartment',
   'documentType',
+  'relatedTo',
+  'referenceNumber',
+  'partsReplaced',
+  'attachmentNote',
   'insurerName',
   'policyNumber',
   'policyType',
@@ -34,13 +39,13 @@ const filterOptions = [
   { id: 'complaint', label: 'Complaints' },
   { id: 'expense', label: 'Expenses' },
   { id: 'income', label: 'Income' },
-  { id: 'document', label: 'Documents' },
+  { id: 'document', label: 'Records' },
 ]
 
 const groupTitles = {
   bill: 'Bills',
   complaint: 'Complaints',
-  document: 'Documents',
+  document: 'Records / Maintenance',
   expense: 'Expenses',
   income: 'Income',
   insurance: 'Insurance',
@@ -97,15 +102,15 @@ function RecordsPage({ onNavigate }) {
   return (
     <>
       <AppHeader
-        title="📄 Records"
+        title="Records"
         eyebrow="Searchable archive"
-        description="Receipts, documents, complaint IDs, vendor details, and payment history in one place."
+        description="Receipts, maintenance history, complaint IDs, vendor details, and payment records in one place."
       />
 
       {!hasItems ? (
         <EmptyState
           title="No records yet"
-          description="Your bills, subscriptions, vendors, complaints, documents, insurance and expenses will appear here once added."
+          description="Your bills, subscriptions, vendors, complaints, records, insurance and expenses will appear here once added."
           cta={
             <button
               type="button"
@@ -118,7 +123,7 @@ function RecordsPage({ onNavigate }) {
         />
       ) : (
         <>
-          <label className="mb-5 block">
+          <label className="mb-4 block md:max-w-xl">
             <span className="sr-only">Search records</span>
             <input
               type="search"
@@ -129,7 +134,7 @@ function RecordsPage({ onNavigate }) {
             />
           </label>
 
-          <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 py-1">
+          <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 py-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
             {filterOptions.map((option) => {
               const isActive = option.id === selectedType
 
@@ -156,7 +161,7 @@ function RecordsPage({ onNavigate }) {
                 key={group.id}
                 title={`${group.emoji} ${groupTitles[group.id] ?? group.label}`}
               >
-                <div className="space-y-2">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                   {group.items.length > 0 ? (
                     group.items.map((item) => (
                       <ItemCard key={item.id} item={item} onOpen={setSelectedItem} />

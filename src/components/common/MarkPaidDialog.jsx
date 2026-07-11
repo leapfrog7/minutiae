@@ -37,7 +37,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
       aria-modal="true"
       aria-label="Mark as paid"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20">
+      <div className="max-h-[86vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20 md:max-w-xl">
         <h2 className="text-base font-bold text-stone-950">Mark as paid?</h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
           Add this payment to Money as an expense too?
@@ -45,7 +45,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
 
         {isVendor && (
           <div className="mt-4 grid gap-2 rounded-2xl bg-stone-50 px-3 py-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <CompactField label="Paid">
                 <CompactInput
                   type="number"
@@ -67,7 +67,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
                 </select>
               </CompactField>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <CompactField label="Adjust">
                 <CompactInput
                   type="number"

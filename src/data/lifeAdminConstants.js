@@ -11,6 +11,7 @@ export const statuses = [
   { id: 'pending', label: 'Pending', tone: 'amber' },
   { id: 'unpaid', label: 'Unpaid', tone: 'amber' },
   { id: 'paid', label: 'Paid', tone: 'emerald' },
+  { id: 'completed', label: 'Completed', tone: 'emerald' },
   { id: 'received', label: 'Received', tone: 'emerald' },
   { id: 'expected', label: 'Expected', tone: 'sky' },
   { id: 'overdue', label: 'Overdue', tone: 'rose' },
