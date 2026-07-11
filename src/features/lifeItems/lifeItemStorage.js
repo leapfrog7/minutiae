@@ -1,7 +1,10 @@
 import {
+  buildNextCycleItemDraft,
   createExpenseFromSourceItem,
   getDateInputValue,
+  getSnoozeUpdates,
   hasLinkedExpense,
+  hasDuplicateNextCycleItem,
   shouldOfferRecordExpense,
 } from './lifeItemHelpers'
 
@@ -563,6 +566,44 @@ export function recordExpenseForLifeItem(item, dateOverride) {
     expenseItem,
     sourceItem: item,
   }
+}
+
+export function createNextCycleItem(item) {
+  const currentItems = getLifeItems()
+  const draft = buildNextCycleItemDraft(item)
+
+  if (!draft) {
+    return {
+      duplicateSkipped: false,
+      item: null,
+    }
+  }
+
+  if (hasDuplicateNextCycleItem(currentItems, draft)) {
+    return {
+      duplicateSkipped: true,
+      item: null,
+    }
+  }
+
+  const timestamp = new Date().toISOString()
+  const nextItem = withTimestamps(draft, timestamp)
+  saveLifeItems([nextItem, ...currentItems])
+
+  return {
+    duplicateSkipped: false,
+    item: nextItem,
+  }
+}
+
+export function snoozeLifeItem(item, days) {
+  const updates = getSnoozeUpdates(item, days)
+
+  if (!updates) {
+    return item
+  }
+
+  return updateLifeItem(item.id, updates)
 }
 
 export function deleteLifeItem(id) {

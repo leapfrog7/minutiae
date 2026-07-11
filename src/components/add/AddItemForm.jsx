@@ -10,6 +10,8 @@ import {
 import { getItemTypeMeta } from '../../data/itemTypes'
 import {
   calculateVendorSettlement,
+  formatDisplayDate,
+  getDuplicateWarningItems,
   hasLinkedExpense,
 } from '../../features/lifeItems/lifeItemHelpers'
 import { getLifeItems } from '../../features/lifeItems/lifeItemStorage'
@@ -34,6 +36,7 @@ const defaultValuesByType = {
     amount: '',
     dueDate: today(),
     frequency: 'monthly',
+    nextReminderMode: 'auto',
     status: 'unpaid',
     addToMoney: 'yes',
     paymentMode: 'UPI',
@@ -154,6 +157,11 @@ const frequencyOptions = [
   { value: 'yearly', label: 'Yearly' },
   { value: 'one_time', label: 'One-time' },
 ]
+const billNextReminderOptions = [
+  { value: 'auto', label: 'Auto-create after paid' },
+  { value: 'ask', label: 'Ask each time' },
+  { value: 'none', label: 'Do not create' },
+]
 const billingCycleOptions = frequencyOptions.filter(
   (option) => option.value !== 'one_time',
 )
@@ -257,6 +265,16 @@ function AddItemForm({
   const [submitted, setSubmitted] = useState(false)
 
   const errors = useMemo(() => validateForm(selectedType, form), [form, selectedType])
+  const duplicateWarningItems = useMemo(() => {
+    try {
+      return getDuplicateWarningItems(
+        buildLifeItem(selectedType, form),
+        getLifeItems(),
+      )
+    } catch {
+      return []
+    }
+  }, [form, selectedType])
   const statusOptions = statusOptionsByType[selectedType] ?? ['pending']
 
   useEffect(() => {
@@ -373,6 +391,11 @@ function AddItemForm({
             <Field label="Frequency">
               <SelectInput value={form.frequency} onChange={(event) => updateField('frequency', event.target.value)}>
                 {frequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </SelectInput>
+            </Field>
+            <Field label="Next reminder">
+              <SelectInput value={form.nextReminderMode} onChange={(event) => updateField('nextReminderMode', event.target.value)}>
+                {billNextReminderOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </SelectInput>
             </Field>
             <CommonMoneyFields
@@ -734,6 +757,10 @@ function AddItemForm({
           <TextInput as="textarea" rows="3" value={form.notes} onChange={(event) => updateField('notes', event.target.value)} placeholder="Anything useful to remember" />
         </Field>
 
+        {duplicateWarningItems.length > 0 && (
+          <DuplicateWarning items={duplicateWarningItems} />
+        )}
+
         <button
           type="submit"
           className="mt-1 rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white shadow-sm shadow-teal-900/20 disabled:bg-stone-300 md:col-span-2 md:justify-self-end md:px-8"
@@ -758,6 +785,36 @@ function FormGroup({ children, title }) {
       {children}
     </section>
   )
+}
+
+function DuplicateWarning({ items }) {
+  return (
+    <section className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 md:col-span-2">
+      <p className="text-sm font-bold text-amber-900">Similar item already exists</p>
+      <div className="mt-2 grid gap-1">
+        {items.map((item) => (
+          <p key={item.id} className="text-xs font-semibold text-stone-700">
+            {item.title || item.vendorName || item.relatedTo || 'Saved item'} -{' '}
+            {formatDisplayDate(getDuplicateWarningDate(item))}
+          </p>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function getDuplicateWarningDate(item) {
+  const dateValue =
+    item.dueDate ||
+    item.paymentDate ||
+    item.renewalDate ||
+    item.serviceDate ||
+    item.documentDate ||
+    item.date ||
+    item.createdAt ||
+    ''
+
+  return String(dateValue).slice(0, 10)
 }
 
 function ReminderIntervalControl({
@@ -1157,6 +1214,7 @@ function buildLifeItem(type, form) {
       type,
       amount: toNumber(form.amount),
       frequency: form.frequency,
+      nextReminderMode: form.nextReminderMode,
     }
   }
 
@@ -1282,6 +1340,7 @@ function getInitialForm(type, initialItem) {
       addToMoney:
         initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
       frequency: normalizeOption(initialItem.frequency, 'monthly'),
+      nextReminderMode: normalizeOption(initialItem.nextReminderMode, 'auto'),
     }
   }
 

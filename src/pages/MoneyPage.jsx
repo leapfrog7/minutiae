@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
-import CollapsibleSection from '../components/common/CollapsibleSection'
-import EmptyState from '../components/common/EmptyState'
-import ItemCard from '../components/common/ItemCard'
-import ItemDetailSheet from '../components/common/ItemDetailSheet'
-import SectionCard from '../components/common/SectionCard'
-import AppHeader from '../components/layout/AppHeader'
+import { useMemo, useState } from "react";
+import CollapsibleSection from "../components/common/CollapsibleSection";
+import EmptyState from "../components/common/EmptyState";
+import ItemCard from "../components/common/ItemCard";
+import ItemDetailSheet from "../components/common/ItemDetailSheet";
+import SectionCard from "../components/common/SectionCard";
+import AppHeader from "../components/layout/AppHeader";
 import {
   formatAmount,
   formatDisplayDate,
@@ -22,103 +22,103 @@ import {
   getReceivedIncomeItemsForMonth,
   getSavingsRate,
   getUnpaidExpenseItemsForMonth,
-} from '../features/lifeItems/lifeItemHelpers'
-import { getLifeItems } from '../features/lifeItems/lifeItemStorage'
+} from "../features/lifeItems/lifeItemHelpers";
+import { getLifeItems } from "../features/lifeItems/lifeItemStorage";
 
 const obligationGroups = [
-  ['subscription', 'Subscriptions'],
-  ['bill', 'Bills'],
-  ['vendor', 'Vendors'],
-  ['insurance', 'Insurance'],
-]
+  ["subscription", "Subscriptions"],
+  ["bill", "Bills"],
+  ["vendor", "Vendors"],
+  ["insurance", "Insurance"],
+];
 
 function MoneyPage({ onNavigate }) {
-  const [items, setItems] = useState(() => getLifeItems())
-  const [selectedItem, setSelectedItem] = useState(null)
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey())
+  const [items, setItems] = useState(() => getLifeItems());
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
 
   function refreshItems(nextSelectedItem) {
-    setItems(getLifeItems())
-    setSelectedItem(nextSelectedItem ?? null)
+    setItems(getLifeItems());
+    setSelectedItem(nextSelectedItem ?? null);
   }
 
   function moveMonth(offset) {
-    const date = new Date(`${selectedMonth}-01T00:00:00`)
-    date.setMonth(date.getMonth() + offset)
+    const date = new Date(`${selectedMonth}-01T00:00:00`);
+    date.setMonth(date.getMonth() + offset);
     setSelectedMonth(
-      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
-    )
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+    );
   }
 
-  const currentMonth = getCurrentMonthKey()
+  const currentMonth = getCurrentMonthKey();
   const incomeItems = useMemo(
     () => getReceivedIncomeItemsForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const expectedIncomeItems = useMemo(
     () => getExpectedIncomeItemsForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const incomeTotal = useMemo(
     () => getIncomeTotalForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const expectedIncomeTotal = useMemo(
     () => getExpectedIncomeTotalForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const monthlyBalance = useMemo(
     () => getMonthlyBalance(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const savingsRate = useMemo(
     () => getSavingsRate(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const incomeBreakdown = useMemo(
     () => getIncomeBreakdown(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const paidExpenseItems = useMemo(
     () => getExpenseItemsForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const expenseStats = useMemo(
     () => getExpenseStatsForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const categoryBreakdown = useMemo(
     () => getCategoryBreakdown(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const obligations = useMemo(
     () => getRecurringObligationsForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const scheduledAutoPayItems = useMemo(
     () => obligations.items.filter(isScheduledAutoPay),
     [obligations],
-  )
+  );
   const scheduledAutoPayTotal = scheduledAutoPayItems.reduce(
     (total, item) => total + Number(item.amount || item.amountDue || 0),
     0,
-  )
+  );
   const unpaidExpenseItems = useMemo(
     () => getUnpaidExpenseItemsForMonth(items, selectedMonth),
     [items, selectedMonth],
-  )
+  );
   const unpaidExpenseTotal = unpaidExpenseItems.reduce(
     (total, item) => total + Number(item.amount || 0),
     0,
-  )
-  const hasIncome = incomeItems.length > 0
-  const hasPaidExpenses = paidExpenseItems.length > 0
-  const hasMonthlyPicture = hasIncome || hasPaidExpenses
+  );
+  const hasIncome = incomeItems.length > 0;
+  const hasPaidExpenses = paidExpenseItems.length > 0;
+  const hasMonthlyPicture = hasIncome || hasPaidExpenses;
 
   return (
     <>
       <AppHeader
-        title="Money"
+        title="💸 Money"
         eyebrow="Household spending view"
         description="Income received, paid expenses, and balance for the selected month."
       />
@@ -176,14 +176,14 @@ function MoneyPage({ onNavigate }) {
               <div className="grid grid-cols-2 gap-2 md:max-w-md">
                 <button
                   type="button"
-                  onClick={() => onNavigate({ page: 'add', type: 'income' })}
+                  onClick={() => onNavigate({ page: "add", type: "income" })}
                   className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
                 >
                   Add income
                 </button>
                 <button
                   type="button"
-                  onClick={() => onNavigate({ page: 'add', type: 'expense' })}
+                  onClick={() => onNavigate({ page: "add", type: "expense" })}
                   className="rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-white"
                 >
                   Add expense
@@ -199,12 +199,12 @@ function MoneyPage({ onNavigate }) {
             value={
               expenseStats.topCategory
                 ? expenseStats.topCategory.category
-                : 'No paid expenses yet'
+                : "No paid expenses yet"
             }
             detail={
               expenseStats.topCategory
                 ? `${formatAmount(expenseStats.topCategory.total)} of paid expenses`
-                : 'Add paid expenses to see this.'
+                : "Add paid expenses to see this."
             }
           />
           <InsightCard
@@ -214,11 +214,13 @@ function MoneyPage({ onNavigate }) {
           />
           <InsightCard
             title="Savings rate"
-            value={savingsRate === null ? 'Not available yet' : `${savingsRate}%`}
+            value={
+              savingsRate === null ? "Not available yet" : `${savingsRate}%`
+            }
             detail={
               savingsRate === null
-                ? 'Add received income to calculate this.'
-                : 'Of received income after paid expenses.'
+                ? "Add received income to calculate this."
+                : "Of received income after paid expenses."
             }
           />
         </div>
@@ -244,7 +246,7 @@ function MoneyPage({ onNavigate }) {
           <CollapsibleSection
             title="Recent paid expenses"
             subtitle="Newest paid expenses in this month."
-            badge={`${paidExpenseItems.length} item${paidExpenseItems.length === 1 ? '' : 's'}`}
+            badge={`${paidExpenseItems.length} item${paidExpenseItems.length === 1 ? "" : "s"}`}
             defaultOpen={paidExpenseItems.length <= 3}
           >
             <div className="space-y-2">
@@ -260,7 +262,9 @@ function MoneyPage({ onNavigate }) {
             title="Income details"
             subtitle="Received income is counted in Balance. Expected income is separate."
             badge={formatAmount(incomeTotal)}
-            defaultOpen={incomeItems.length <= 2 && expectedIncomeItems.length === 0}
+            defaultOpen={
+              incomeItems.length <= 2 && expectedIncomeItems.length === 0
+            }
           >
             <IncomeDetails
               expectedIncomeItems={expectedIncomeItems}
@@ -309,10 +313,10 @@ function MoneyPage({ onNavigate }) {
           >
             <div className="space-y-3">
               {obligationGroups.map(([type, label]) => {
-                const groupItems = obligations.groupedItems[type]
+                const groupItems = obligations.groupedItems[type];
 
                 if (groupItems.length === 0) {
-                  return null
+                  return null;
                 }
 
                 return (
@@ -330,7 +334,7 @@ function MoneyPage({ onNavigate }) {
                       ))}
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           </CollapsibleSection>
@@ -344,7 +348,7 @@ function MoneyPage({ onNavigate }) {
         onItemUpdated={refreshItems}
       />
     </>
-  )
+  );
 }
 
 function MonthlyPicture({ incomeTotal, monthlyBalance, paidExpenseTotal }) {
@@ -374,20 +378,20 @@ function MonthlyPicture({ incomeTotal, monthlyBalance, paidExpenseTotal }) {
         <MoneyMetric
           label="Balance"
           value={formatAmount(monthlyBalance)}
-          tone={monthlyBalance >= 0 ? 'balance' : 'shortfall'}
+          tone={monthlyBalance >= 0 ? "balance" : "shortfall"}
         />
       </div>
     </section>
-  )
+  );
 }
 
 function MoneyMetric({ label, tone, value }) {
   const toneClass = {
-    balance: 'bg-teal-50 text-teal-800',
-    expense: 'bg-rose-50 text-rose-800',
-    income: 'bg-emerald-50 text-emerald-800',
-    shortfall: 'bg-amber-50 text-amber-800',
-  }[tone]
+    balance: "bg-teal-50 text-teal-800",
+    expense: "bg-rose-50 text-rose-800",
+    income: "bg-emerald-50 text-emerald-800",
+    shortfall: "bg-amber-50 text-amber-800",
+  }[tone];
 
   return (
     <div className={`rounded-2xl px-3 py-3 ${toneClass}`}>
@@ -398,7 +402,7 @@ function MoneyMetric({ label, tone, value }) {
         {value}
       </p>
     </div>
-  )
+  );
 }
 
 function InsightCard({ detail, title, value }) {
@@ -412,7 +416,7 @@ function InsightCard({ detail, title, value }) {
       </p>
       <p className="mt-1 text-xs leading-5 text-stone-500">{detail}</p>
     </article>
-  )
+  );
 }
 
 function CategoryBar({ item }) {
@@ -431,7 +435,7 @@ function CategoryBar({ item }) {
         />
       </div>
     </div>
-  )
+  );
 }
 
 function IncomeDetails({
@@ -496,7 +500,7 @@ function IncomeDetails({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function QuietNote({ children }) {
@@ -504,35 +508,35 @@ function QuietNote({ children }) {
     <p className="rounded-xl bg-stone-50 px-3 py-3 text-sm font-semibold text-stone-600">
       {children}
     </p>
-  )
+  );
 }
 
 function getLargestExpenseValue(item) {
   if (!item) {
-    return 'No paid expenses yet'
+    return "No paid expenses yet";
   }
 
-  return `${formatAmount(item.amount)} - ${item.title || item.category || 'Expense'}`
+  return `${formatAmount(item.amount)} - ${item.title || item.category || "Expense"}`;
 }
 
 function getLargestExpenseDetail(item) {
   if (!item) {
-    return 'Add paid expenses to see this.'
+    return "Add paid expenses to see this.";
   }
 
-  const date = item.date ? formatDisplayDate(item.date) : ''
-  const category = item.category || 'Expense'
+  const date = item.date ? formatDisplayDate(item.date) : "";
+  const category = item.category || "Expense";
 
-  return [category, date].filter(Boolean).join(' - ')
+  return [category, date].filter(Boolean).join(" - ");
 }
 
 function isScheduledAutoPay(item) {
   return (
     item.autoPay === true ||
-    item.autoPay === 'yes' ||
+    item.autoPay === "yes" ||
     item.autoRenewal === true ||
-    item.paymentMode === 'Auto Debit'
-  )
+    item.paymentMode === "Auto Debit"
+  );
 }
 
-export default MoneyPage
+export default MoneyPage;

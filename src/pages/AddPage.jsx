@@ -1,82 +1,79 @@
 import { useEffect, useState } from 'react'
 import AddItemForm from '../components/add/AddItemForm'
 import AddItemTypeSelector from '../components/add/AddItemTypeSelector'
-import SectionCard from '../components/common/SectionCard'
+import NextReminderPrompt from '../components/common/NextReminderPrompt'
+import Toast from '../components/common/Toast'
 import AppHeader from '../components/layout/AppHeader'
 import { itemTypes } from '../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../data/itemTypes'
+import {
+  applyNextReminderBehavior,
+  getNextReminderToastMessage,
+} from '../features/lifeItems/nextReminderFlow'
 import { addLifeItemWithLinkedExpense } from '../features/lifeItems/lifeItemStorage'
 
-function AddPage({ initialType = '', onNavigate }) {
+function AddPage({ initialType = '' }) {
   const [selectedType, setSelectedType] = useState(initialType)
-  const [savedItem, setSavedItem] = useState(null)
+  const [pendingNextReminderItem, setPendingNextReminderItem] = useState(null)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
     if (initialType) {
-      setSavedItem(null)
       setSelectedType(initialType)
     }
   }, [initialType])
 
   useEffect(() => {
     function handleInternalBack(event) {
-      if (!selectedType && !savedItem) {
+      if (!selectedType) {
         return
       }
 
       event.preventDefault()
-      setSavedItem(null)
       setSelectedType('')
     }
 
     window.addEventListener('minutiae:back', handleInternalBack)
     return () => window.removeEventListener('minutiae:back', handleInternalBack)
-  }, [savedItem, selectedType])
+  }, [selectedType])
 
   function handleSave(item, options) {
-    setSavedItem(addLifeItemWithLinkedExpense(item, options).item)
+    try {
+      const result = addLifeItemWithLinkedExpense(item, options)
+      setSelectedType('')
+      setToast({
+        message: result.expenseCreated
+          ? 'Saved and added to Money'
+          : `${getSaveLabel(result.item.type)} saved`,
+        tone: 'success',
+      })
+      handlePostSaveNextReminder(result.item)
+    } catch {
+      setToast({
+        message: 'Save failed. Please try again.',
+        tone: 'error',
+      })
+    }
   }
 
-  function handleAddAnother() {
-    setSavedItem(null)
-    setSelectedType('')
-  }
+  function handlePostSaveNextReminder(item) {
+    if (!shouldPromptForNextReminder(item)) {
+      return
+    }
 
-  if (savedItem) {
-    const typeMeta = getItemTypeMeta(savedItem.type)
+    const result = applyNextReminderBehavior(item)
 
-    return (
-      <>
-        <AppHeader
-          title="Add"
-          eyebrow="Saved to Minutiae"
-          description="This item is now available in Records and will show up in Calendar or Money where relevant."
-        />
+    if (result.behavior === 'ask') {
+      setPendingNextReminderItem(item)
+      return
+    }
 
-        <SectionCard
-          title={`${typeMeta.emoji} ${savedItem.title}`}
-          className="md:mx-auto md:max-w-xl"
-        >
-          <p className="text-sm text-stone-600">Saved to Minutiae</p>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={handleAddAnother}
-              className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-bold text-stone-800"
-            >
-              Add another
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('records')}
-              className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
-            >
-              View records
-            </button>
-          </div>
-        </SectionCard>
-      </>
-    )
+    if (result.behavior === 'auto') {
+      setToast({
+        message: getNextReminderToastMessage(result),
+        tone: 'success',
+      })
+    }
   }
 
   return (
@@ -103,8 +100,39 @@ function AddPage({ initialType = '', onNavigate }) {
           onSelectType={setSelectedType}
         />
       )}
+
+      <Toast
+        message={toast?.message}
+        tone={toast?.tone}
+        onDismiss={() => setToast(null)}
+      />
+
+      <NextReminderPrompt
+        item={pendingNextReminderItem}
+        onClose={() => setPendingNextReminderItem(null)}
+        onCreated={(result) =>
+          setToast({
+            message: getNextReminderToastMessage(result),
+            tone: 'success',
+          })
+        }
+      />
     </>
   )
+}
+
+function shouldPromptForNextReminder(item) {
+  return ['paid', 'completed', 'closed'].includes(item?.status)
+}
+
+function getSaveLabel(type) {
+  const label = getItemTypeMeta(type).label
+
+  if (type === 'document') {
+    return 'Record'
+  }
+
+  return label
 }
 
 export default AddPage

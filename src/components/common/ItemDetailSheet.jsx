@@ -4,33 +4,44 @@ import { getStatusMeta } from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
 import {
   canRecordPaymentAsExpense,
+  canSnoozeItem,
   formatAmount,
   formatCycleLabel,
   formatDisplayDate,
   createTelLink,
   createUpiPaymentLink,
   getQuickStatusAction,
+  getBillCycleHistory,
   getRelevantDate,
   hasLinkedExpense,
   shouldOfferRecordExpense,
 } from '../../features/lifeItems/lifeItemHelpers'
 import {
+  applyNextReminderBehavior,
+  getNextReminderToastMessage,
+} from '../../features/lifeItems/nextReminderFlow'
+import {
   deleteLifeItem,
   getLifeItems,
   markLifeItemPaid,
   recordExpenseForLifeItem,
+  snoozeLifeItem,
   updateLifeItem,
   updateLifeItemWithLinkedExpense,
 } from '../../features/lifeItems/lifeItemStorage'
 import ConfirmDialog from './ConfirmDialog'
 import MarkPaidDialog from './MarkPaidDialog'
+import NextReminderPrompt from './NextReminderPrompt'
 import StatusBadge from './StatusBadge'
+import Toast from './Toast'
 
 function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   const [isEditing, setIsEditing] = useState(false)
   const [showPaidConfirm, setShowPaidConfirm] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [copiedValue, setCopiedValue] = useState('')
+  const [pendingNextReminderItem, setPendingNextReminderItem] = useState(null)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
     function handleInternalBack(event) {
@@ -72,6 +83,8 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   const allItems = getLifeItems()
   const expenseRecorded = hasLinkedExpense(allItems, item)
   const canRecordExpense = shouldOfferRecordExpense(item, allItems)
+  const billHistory = getBillCycleHistory(allItems, item)
+  const showSnoozeActions = canSnoozeItem(item) && !isFinishedForSnooze(item)
 
   function handleQuickAction() {
     if (!quickAction) {
@@ -85,6 +98,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
 
     if (quickAction.status === 'paid') {
       const result = markLifeItemPaid(item)
+      offerNextReminder(result.updatedItem)
       onItemUpdated(result.updatedItem)
       return
     }
@@ -94,12 +108,14 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
         ? { status: quickAction.status, receivedDate: new Date().toISOString().slice(0, 10) }
         : { status: quickAction.status }
     const updatedItem = updateLifeItem(item.id, updates)
+    offerNextReminder(updatedItem)
     onItemUpdated(updatedItem)
   }
 
   function handleConfirmPaid({ recordExpense, updates }) {
     const result = markLifeItemPaid(item, { recordExpense, updates })
     setShowPaidConfirm(false)
+    offerNextReminder(result.updatedItem)
     onItemUpdated(result.updatedItem)
   }
 
@@ -109,13 +125,44 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   }
 
   function handleEditSave(updates, options) {
-    const { updatedItem } = updateLifeItemWithLinkedExpense(
+    const { expenseCreated, updatedItem } = updateLifeItemWithLinkedExpense(
       item.id,
       updates,
       options,
     )
     setIsEditing(false)
+    setToast({
+      message: expenseCreated ? 'Changes saved and added to Money' : 'Changes saved',
+      tone: 'success',
+    })
+    if (movedToRecurringDoneStatus(item, updatedItem)) {
+      offerNextReminder(updatedItem)
+    }
     onItemUpdated(updatedItem)
+  }
+
+  function offerNextReminder(updatedItem) {
+    const result = applyNextReminderBehavior(updatedItem)
+
+    if (result.behavior === 'ask') {
+      setPendingNextReminderItem(updatedItem)
+      return
+    }
+
+    if (result.behavior === 'auto') {
+      setToast({
+        message: getNextReminderToastMessage(result),
+        tone: 'success',
+      })
+    }
+  }
+
+  function handleNextReminderCreated(result) {
+    setToast({
+      message: getNextReminderToastMessage(result),
+      tone: 'success',
+    })
+    onItemUpdated(pendingNextReminderItem)
   }
 
   function handleDelete() {
@@ -133,6 +180,15 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
       setCopiedValue(label)
       window.setTimeout(() => setCopiedValue(''), 1600)
     })
+  }
+
+  function handleSnooze(days) {
+    const updatedItem = snoozeLifeItem(item, days)
+    setToast({
+      message: `Reminder moved to ${formatDisplayDate(getRelevantDate(updatedItem))}`,
+      tone: 'success',
+    })
+    onItemUpdated(updatedItem)
   }
 
   return (
@@ -207,6 +263,14 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
               <RecordContactActions item={item} />
             )}
 
+            {showSnoozeActions && (
+              <SnoozeActions onSnooze={handleSnooze} />
+            )}
+
+            {item.type === 'bill' && billHistory.length > 1 && (
+              <BillCycleHistory currentItem={item} items={billHistory} />
+            )}
+
             <div className="mt-4 grid gap-2 md:grid-cols-2">
               {expenseRecorded && canRecordPaymentAsExpense(item) && (
                 <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
@@ -269,8 +333,106 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
           onConfirm={handleConfirmPaid}
         />
       )}
+
+      <NextReminderPrompt
+        item={pendingNextReminderItem}
+        onClose={() => setPendingNextReminderItem(null)}
+        onCreated={handleNextReminderCreated}
+      />
+
+      <Toast
+        message={toast?.message}
+        tone={toast?.tone}
+        onDismiss={() => setToast(null)}
+      />
     </>
   )
+}
+
+function movedToRecurringDoneStatus(previousItem, updatedItem) {
+  if (!updatedItem || previousItem?.status === updatedItem.status) {
+    return false
+  }
+
+  return ['paid', 'completed', 'closed'].includes(updatedItem.status)
+}
+
+function isFinishedForSnooze(item) {
+  return ['paid', 'completed', 'closed', 'resolved', 'archived'].includes(item.status)
+}
+
+function SnoozeActions({ onSnooze }) {
+  const options = [
+    { days: 1, label: 'Tomorrow' },
+    { days: 3, label: 'In 3 days' },
+    { days: 7, label: 'Next week' },
+  ]
+
+  return (
+    <section className="mt-4 rounded-2xl border border-stone-200 bg-white px-3 py-3">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">
+        Remind later
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {options.map((option) => (
+          <button
+            key={option.days}
+            type="button"
+            onClick={() => onSnooze(option.days)}
+            className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-bold text-stone-800"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function BillCycleHistory({ currentItem, items }) {
+  return (
+    <section className="mt-4 rounded-2xl border border-stone-200 bg-white px-3 py-3">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-stone-500">
+        Previous cycles
+      </p>
+      <div className="mt-3 grid gap-2">
+        {items.map((bill) => {
+          const isCurrent = bill.id === currentItem.id
+
+          return (
+            <div
+              key={bill.id}
+              className={`rounded-xl px-3 py-2 ring-1 ${
+                isCurrent
+                  ? 'bg-teal-50 text-teal-900 ring-teal-100'
+                  : 'bg-stone-50 text-stone-700 ring-stone-100'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-bold">
+                  {formatDisplayDate(String(bill.dueDate || bill.paidDate || bill.createdAt || '').slice(0, 10))}
+                </p>
+                {Number(bill.amount || 0) > 0 && (
+                  <p className="shrink-0 text-sm font-bold">
+                    {formatAmount(bill.amount)}
+                  </p>
+                )}
+              </div>
+              <p className="mt-1 text-xs font-semibold">
+                {isCurrent ? 'Current item' : getBillCycleStatusLabel(bill)}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function getBillCycleStatusLabel(bill) {
+  const statusMeta = getStatusMeta(bill.status)
+  const paidDate = bill.paidDate ? ` - paid ${formatDisplayDate(bill.paidDate)}` : ''
+  return `${statusMeta.label}${paidDate}`
 }
 
 function VendorPaymentActions({ copiedValue, item, onCopy }) {

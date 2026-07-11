@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 
 function ConfirmDialog({
+  cancelLabel = 'Cancel',
   confirmLabel = 'Delete',
   message,
   onCancel,
@@ -39,7 +40,7 @@ function ConfirmDialog({
             onClick={onCancel}
             className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-bold text-stone-800"
           >
-            Cancel
+            {cancelLabel}
           </button>
           <button
             type="button"

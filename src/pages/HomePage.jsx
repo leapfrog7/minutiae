@@ -3,7 +3,9 @@ import ActionItemCard from "../components/common/ActionItemCard";
 import EmptyState from "../components/common/EmptyState";
 import ItemDetailSheet from "../components/common/ItemDetailSheet";
 import MarkPaidDialog from "../components/common/MarkPaidDialog";
+import NextReminderPrompt from "../components/common/NextReminderPrompt";
 import SectionCard from "../components/common/SectionCard";
+import Toast from "../components/common/Toast";
 import SummaryPreviewSheet from "../components/dashboard/SummaryPreviewSheet";
 import SummaryTile from "../components/dashboard/SummaryTile";
 import AppHeader from "../components/layout/AppHeader";
@@ -30,17 +32,28 @@ import {
   getTodayActionSummary,
 } from "../features/lifeItems/lifeItemHelpers";
 import {
+  applyNextReminderBehavior,
+  getNextReminderToastMessage,
+} from "../features/lifeItems/nextReminderFlow";
+import {
   getLifeItems,
   markLifeItemPaid,
   updateLifeItem,
 } from "../features/lifeItems/lifeItemStorage";
 
+const onboardingDismissedKey = "minutiae-onboarding-dismissed";
+
 function HomePage({ onNavigate }) {
   const [items, setItems] = useState(() => getLifeItems());
   const [pendingPaidItem, setPendingPaidItem] = useState(null);
+  const [pendingNextReminderItem, setPendingNextReminderItem] = useState(null);
   const [preview, setPreview] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [backupRefreshKey, setBackupRefreshKey] = useState(0);
+  const [toast, setToast] = useState(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => localStorage.getItem(onboardingDismissedKey) === "yes",
+  );
 
   function refreshItems(nextSelectedItem) {
     setItems(getLifeItems());
@@ -60,18 +73,45 @@ function HomePage({ onNavigate }) {
     }
 
     if (quickAction.status === "paid") {
-      markLifeItemPaid(item);
+      const result = markLifeItemPaid(item);
+      offerNextReminder(result.updatedItem);
       refreshItems(null);
       return;
     }
 
-    updateLifeItem(item.id, { status: quickAction.status });
+    const updatedItem = updateLifeItem(item.id, { status: quickAction.status });
+    offerNextReminder(updatedItem);
     refreshItems(null);
   }
 
   function handleConfirmPaid({ recordExpense, updates }) {
-    markLifeItemPaid(pendingPaidItem, { recordExpense, updates });
+    const result = markLifeItemPaid(pendingPaidItem, { recordExpense, updates });
     setPendingPaidItem(null);
+    offerNextReminder(result.updatedItem);
+    refreshItems(null);
+  }
+
+  function offerNextReminder(updatedItem) {
+    const result = applyNextReminderBehavior(updatedItem);
+
+    if (result.behavior === "ask") {
+      setPendingNextReminderItem(updatedItem);
+      return;
+    }
+
+    if (result.behavior === "auto") {
+      setToast({
+        message: getNextReminderToastMessage(result),
+        tone: "success",
+      });
+    }
+  }
+
+  function handleNextReminderCreated(result) {
+    setToast({
+      message: getNextReminderToastMessage(result),
+      tone: "success",
+    });
     refreshItems(null);
   }
 
@@ -128,6 +168,7 @@ function HomePage({ onNavigate }) {
     },
   ];
   const hasItems = items.length > 0;
+  const shouldShowOnboarding = items.length < 3 && !onboardingDismissed;
   const backupState = useMemo(
     () => getBackupReminderState(items.length),
     [items.length, backupRefreshKey],
@@ -177,6 +218,11 @@ function HomePage({ onNavigate }) {
     setBackupRefreshKey((current) => current + 1);
   }
 
+  function handleDismissOnboarding() {
+    localStorage.setItem(onboardingDismissedKey, "yes");
+    setOnboardingDismissed(true);
+  }
+
   return (
     <>
       <AppHeader
@@ -191,25 +237,29 @@ function HomePage({ onNavigate }) {
         />
       )}
 
+      {shouldShowOnboarding && (
+        <OnboardingCard
+          onAdd={() => onNavigate("add")}
+          onDismiss={handleDismissOnboarding}
+        />
+      )}
+
       {!hasItems ? (
-        <EmptyState
-          title="Start your household command centre"
-          description="Add bills, subscriptions, vendors, complaints, insurance, documents or expenses to keep track of what needs paying, renewing or follow-up."
-          cta={
-            <>
+        !shouldShowOnboarding && (
+          <EmptyState
+            title="No items yet"
+            description="Add a bill, income, vendor payment, subscription, complaint or maintenance reminder to begin."
+            cta={
               <button
                 type="button"
                 onClick={() => onNavigate("add")}
                 className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
               >
-                Add your first item
+                Add item
               </button>
-              <p className="mt-3 text-xs font-semibold text-stone-500">
-                Your data stays on this device unless you export a backup.
-              </p>
-            </>
-          }
-        />
+            }
+          />
+        )
       ) : (
         <div className="space-y-3 md:space-y-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-start">
@@ -297,7 +347,74 @@ function HomePage({ onNavigate }) {
           onConfirm={handleConfirmPaid}
         />
       )}
+
+      <NextReminderPrompt
+        item={pendingNextReminderItem}
+        onClose={() => setPendingNextReminderItem(null)}
+        onCreated={handleNextReminderCreated}
+      />
+
+      <Toast
+        message={toast?.message}
+        tone={toast?.tone}
+        onDismiss={() => setToast(null)}
+      />
     </>
+  );
+}
+
+function OnboardingCard({ onAdd, onDismiss }) {
+  const checklist = [
+    "Add salary or income",
+    "Add recurring bills or EMIs",
+    "Add subscriptions",
+    "Add vendor payments",
+    "Add maintenance reminders",
+  ];
+
+  return (
+    <SectionCard
+      className="mb-3 border-teal-100 bg-white"
+      eyebrow="Get started"
+      title="Start your household command centre"
+    >
+      <p className="text-sm leading-6 text-stone-700">
+        Add a few basics first. Minutiae works best when it knows your income,
+        recurring bills, vendor payments and reminders.
+      </p>
+      <div className="mt-3 grid gap-2">
+        {checklist.map((item) => (
+          <p
+            key={item}
+            className="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-700"
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700"
+            >
+              {"\u2713"}
+            </span>
+            {item}
+          </p>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+        >
+          Add first item
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-stone-700 ring-1 ring-stone-200"
+        >
+          Dismiss
+        </button>
+      </div>
+    </SectionCard>
   );
 }
 

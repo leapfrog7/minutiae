@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import AgendaGroup from "../components/calendar/AgendaGroup";
 import EmptyState from "../components/common/EmptyState";
 import ItemDetailSheet from "../components/common/ItemDetailSheet";
 import MarkPaidDialog from "../components/common/MarkPaidDialog";
+import NextReminderPrompt from "../components/common/NextReminderPrompt";
+import Toast from "../components/common/Toast";
 import AppHeader from "../components/layout/AppHeader";
 import {
   canRecordPaymentAsExpense,
@@ -11,6 +13,10 @@ import {
   groupAgendaItems,
   hasLinkedExpense,
 } from "../features/lifeItems/lifeItemHelpers";
+import {
+  applyNextReminderBehavior,
+  getNextReminderToastMessage,
+} from "../features/lifeItems/nextReminderFlow";
 import {
   getLifeItems,
   markLifeItemPaid,
@@ -28,14 +34,12 @@ const filterOptions = [
 ];
 
 function CalendarPage({ onNavigate }) {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => getLifeItems());
   const [pendingPaidItem, setPendingPaidItem] = useState(null);
+  const [pendingNextReminderItem, setPendingNextReminderItem] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedType, setSelectedType] = useState("all");
-
-  useEffect(() => {
-    setItems(getLifeItems());
-  }, []);
+  const [toast, setToast] = useState(null);
 
   function refreshItems(nextSelectedItem) {
     setItems(getLifeItems());
@@ -55,18 +59,45 @@ function CalendarPage({ onNavigate }) {
     }
 
     if (quickAction.status === "paid") {
-      markLifeItemPaid(item);
+      const result = markLifeItemPaid(item);
+      offerNextReminder(result.updatedItem);
       refreshItems(null);
       return;
     }
 
-    updateLifeItem(item.id, { status: quickAction.status });
+    const updatedItem = updateLifeItem(item.id, { status: quickAction.status });
+    offerNextReminder(updatedItem);
     refreshItems(null);
   }
 
   function handleConfirmPaid({ recordExpense, updates }) {
-    markLifeItemPaid(pendingPaidItem, { recordExpense, updates });
+    const result = markLifeItemPaid(pendingPaidItem, { recordExpense, updates });
     setPendingPaidItem(null);
+    offerNextReminder(result.updatedItem);
+    refreshItems(null);
+  }
+
+  function offerNextReminder(updatedItem) {
+    const result = applyNextReminderBehavior(updatedItem);
+
+    if (result.behavior === "ask") {
+      setPendingNextReminderItem(updatedItem);
+      return;
+    }
+
+    if (result.behavior === "auto") {
+      setToast({
+        message: getNextReminderToastMessage(result),
+        tone: "success",
+      });
+    }
+  }
+
+  function handleNextReminderCreated(result) {
+    setToast({
+      message: getNextReminderToastMessage(result),
+      tone: "success",
+    });
     refreshItems(null);
   }
 
@@ -90,7 +121,7 @@ function CalendarPage({ onNavigate }) {
       />
 
       {hasItems && (
-        <div className="-mx-4 pt-3 mb-3 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+        <div className="-mx-4 mb-3 flex flex-wrap gap-2 px-4 pb-1 pt-3 md:mx-0 md:px-0">
           {filterOptions.map((option) => {
             const isActive = option.id === selectedType;
 
@@ -99,7 +130,7 @@ function CalendarPage({ onNavigate }) {
                 key={option.id}
                 type="button"
                 onClick={() => setSelectedType(option.id)}
-                className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold ${
+                className={`mb-2 rounded-full px-3 py-2 text-xs font-bold ${
                   isActive
                     ? "bg-teal-700 text-white"
                     : "bg-white text-stone-600 ring-1 ring-stone-200"
@@ -159,6 +190,18 @@ function CalendarPage({ onNavigate }) {
           onConfirm={handleConfirmPaid}
         />
       )}
+
+      <NextReminderPrompt
+        item={pendingNextReminderItem}
+        onClose={() => setPendingNextReminderItem(null)}
+        onCreated={handleNextReminderCreated}
+      />
+
+      <Toast
+        message={toast?.message}
+        tone={toast?.tone}
+        onDismiss={() => setToast(null)}
+      />
     </>
   );
 }

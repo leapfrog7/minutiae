@@ -35,6 +35,8 @@ const addDays = (date, days) => {
   return nextDate
 }
 
+const toDateInput = (date) => date.toISOString().slice(0, 10)
+
 const monthKeyFromDateValue = (dateValue) => {
   const date = toDate(dateValue)
   return date ? getMonthKey(date) : ''
@@ -403,6 +405,464 @@ export function createExpenseFromSourceItem(sourceItem, dateOverride) {
 }
 
 export const createExpenseFromPaidItem = createExpenseFromSourceItem
+
+export function getNextCycleDate(dateString, frequency) {
+  const normalizedFrequency = normalizeCycleValue(frequency)
+
+  if (['one_time', 'as_needed', 'none', 'custom', ''].includes(normalizedFrequency)) {
+    return null
+  }
+
+  const baseDate = dateString ? toDate(String(dateString).slice(0, 10)) : startOfToday()
+
+  if (!baseDate) {
+    return null
+  }
+
+  const nextDate = new Date(baseDate)
+
+  if (normalizedFrequency === 'weekly') {
+    nextDate.setDate(nextDate.getDate() + 7)
+  } else if (normalizedFrequency === '3m') {
+    nextDate.setMonth(nextDate.getMonth() + 3)
+  } else if (normalizedFrequency === '6m') {
+    nextDate.setMonth(nextDate.getMonth() + 6)
+  } else if (normalizedFrequency === '9m') {
+    nextDate.setMonth(nextDate.getMonth() + 9)
+  } else if (normalizedFrequency === '1y') {
+    nextDate.setFullYear(nextDate.getFullYear() + 1)
+  } else if (normalizedFrequency === '2y') {
+    nextDate.setFullYear(nextDate.getFullYear() + 2)
+  } else if (normalizedFrequency === '3y') {
+    nextDate.setFullYear(nextDate.getFullYear() + 3)
+  } else if (normalizedFrequency === '5y') {
+    nextDate.setFullYear(nextDate.getFullYear() + 5)
+  } else if (normalizedFrequency === 'monthly') {
+    nextDate.setMonth(nextDate.getMonth() + 1)
+  } else if (normalizedFrequency === 'quarterly') {
+    nextDate.setMonth(nextDate.getMonth() + 3)
+  } else if (normalizedFrequency === 'six_monthly') {
+    nextDate.setMonth(nextDate.getMonth() + 6)
+  } else if (normalizedFrequency === 'yearly') {
+    nextDate.setFullYear(nextDate.getFullYear() + 1)
+  } else {
+    return null
+  }
+
+  return nextDate.toISOString().slice(0, 10)
+}
+
+export function getNextCycleFrequency(item) {
+  if (item.type === 'bill' || item.type === 'insurance') {
+    return normalizeCycleValue(item.frequency)
+  }
+
+  if (item.type === 'vendor') {
+    return normalizeCycleValue(item.paymentFrequency)
+  }
+
+  if (item.type === 'subscription') {
+    return normalizeCycleValue(item.billingCycle)
+  }
+
+  if (item.type === 'document') {
+    const reminder = getDocumentNextCycleReminder(item)
+    return reminder.frequency
+  }
+
+  return ''
+}
+
+export function getNextCycleBaseDate(item) {
+  if (item.type === 'bill' || item.type === 'insurance') {
+    return item.dueDate || item.paidDate || getDateInputValue()
+  }
+
+  if (item.type === 'vendor') {
+    return item.paymentDate || item.dueDate || item.paidDate || getDateInputValue()
+  }
+
+  if (item.type === 'subscription') {
+    return item.renewalDate || item.dueDate || item.paidDate || getDateInputValue()
+  }
+
+  if (item.type === 'document') {
+    const reminder = getDocumentNextCycleReminder(item)
+    return reminder.date || item.serviceDate || item.documentDate || getDateInputValue()
+  }
+
+  return getDateInputValue()
+}
+
+export function canCreateNextCycleReminder(item) {
+  if (!['bill', 'vendor', 'subscription', 'insurance', 'document'].includes(item?.type)) {
+    return false
+  }
+
+  if (item.type === 'document' && !isRecurringDocumentRecord(item)) {
+    return false
+  }
+
+  return Boolean(getNextCycleDate(getNextCycleBaseDate(item), getNextCycleFrequency(item)))
+}
+
+export function getNextReminderBehavior(item) {
+  if (!canCreateNextCycleReminder(item)) {
+    return 'none'
+  }
+
+  if (item.type !== 'bill') {
+    return 'ask'
+  }
+
+  const behavior = String(item.nextReminderMode || 'auto').toLowerCase()
+  return ['auto', 'ask', 'none'].includes(behavior) ? behavior : 'auto'
+}
+
+export function buildNextCycleItemDraft(item) {
+  if (!canCreateNextCycleReminder(item)) {
+    return null
+  }
+
+  const nextDate = getNextCycleDate(getNextCycleBaseDate(item), getNextCycleFrequency(item))
+  const baseNotes = item.notes ? `${item.notes}\nCreated from previous cycle.` : 'Created from previous cycle.'
+  const common = {
+    ...item,
+    createdAt: undefined,
+    id: undefined,
+    linkedExpenseId: undefined,
+    linkedItemId: undefined,
+    linkedItemType: undefined,
+    paidDate: '',
+    updatedAt: undefined,
+  }
+
+  if (item.type === 'bill') {
+    return {
+      ...common,
+      dueDate: nextDate,
+      notes: baseNotes,
+      status: 'unpaid',
+    }
+  }
+
+  if (item.type === 'vendor') {
+    const amountDue = Number(item.usualAmount || item.monthlyAmount || item.amountDue || item.amount || 0)
+
+    return {
+      ...common,
+      adjustmentAmount: 0,
+      advanceAdjusted: 0,
+      amount: amountDue,
+      amountDue,
+      amountPaid: 0,
+      balancePayable: 0,
+      dueDate: nextDate,
+      notes: baseNotes,
+      paymentDate: nextDate,
+      status: 'unpaid',
+    }
+  }
+
+  if (item.type === 'subscription') {
+    return {
+      ...common,
+      dueDate: nextDate,
+      notes: baseNotes,
+      renewalDate: nextDate,
+      status: item.status === 'unpaid' ? 'unpaid' : 'pending',
+    }
+  }
+
+  if (item.type === 'insurance') {
+    return {
+      ...common,
+      dueDate: nextDate,
+      notes: baseNotes,
+      status: 'unpaid',
+    }
+  }
+
+  if (item.type === 'document') {
+    const reminder = getDocumentNextCycleReminder(item)
+    const nextDocumentDates = {
+      nextServiceDate: '',
+      expiryDate: '',
+      warrantyTill: '',
+      [reminder.field || 'nextServiceDate']: nextDate,
+    }
+
+    return {
+      ...common,
+      date: '',
+      documentDate: '',
+      dueDate: nextDate,
+      ...nextDocumentDates,
+      notes: item.notes
+        ? `${item.notes}\nNext reminder created from previous record.`
+        : 'Next reminder created from previous record.',
+      paidDate: '',
+      serviceDate: '',
+      status: 'pending',
+    }
+  }
+
+  return null
+}
+
+export function hasDuplicateNextCycleItem(items, nextItem) {
+  if (!nextItem) {
+    return false
+  }
+
+  return items.some(
+    (item) =>
+      item.id !== nextItem.id &&
+      item.type === nextItem.type &&
+      getNextCycleIdentity(item) === getNextCycleIdentity(nextItem) &&
+      getNextCycleTargetDate(item) === getNextCycleTargetDate(nextItem),
+  )
+}
+
+export function getNextCyclePromptMessage(item) {
+  const messages = {
+    bill: `Create the next ${item.category || item.title || 'bill'} reminder?`,
+    document: 'Create the next service reminder?',
+    insurance: 'Create the next premium reminder?',
+    subscription: 'Create the next renewal reminder?',
+    vendor: `Create the next ${item.vendorName || item.title || 'vendor'} payment reminder?`,
+  }
+
+  return messages[item.type] || 'Create the next reminder?'
+}
+
+export function canSnoozeItem(item) {
+  return ['bill', 'vendor', 'subscription', 'insurance', 'complaint', 'document'].includes(
+    item?.type,
+  )
+}
+
+export function getSnoozeUpdates(item, days) {
+  if (!canSnoozeItem(item)) {
+    return null
+  }
+
+  const nextDate = toDateInput(addDays(startOfToday(), days))
+
+  if (item.type === 'bill' || item.type === 'insurance') {
+    return { dueDate: nextDate }
+  }
+
+  if (item.type === 'subscription') {
+    return { dueDate: nextDate, renewalDate: nextDate }
+  }
+
+  if (item.type === 'vendor') {
+    return { dueDate: nextDate, paymentDate: nextDate }
+  }
+
+  if (item.type === 'complaint') {
+    return { followUpDate: nextDate }
+  }
+
+  if (item.type === 'document') {
+    const relevantDate = getRelevantDate(item)
+
+    if (item.expiryDate === relevantDate) {
+      return { dueDate: nextDate, expiryDate: nextDate }
+    }
+
+    if (item.warrantyTill === relevantDate) {
+      return { dueDate: nextDate, warrantyTill: nextDate }
+    }
+
+    return { dueDate: nextDate, nextServiceDate: nextDate }
+  }
+
+  return null
+}
+
+export function getDuplicateWarningItems(draftItem, items) {
+  if (!draftItem) {
+    return []
+  }
+
+  const draftIdentity = getSimilarityIdentity(draftItem)
+  const draftDate = getSimilarityDate(draftItem)
+  const draftMonth = draftDate.slice(0, 7)
+
+  if (!draftIdentity) {
+    return []
+  }
+
+  return items
+    .filter((item) => {
+      if (item.id && item.id === draftItem.id) {
+        return false
+      }
+
+      if (item.type !== draftItem.type) {
+        return false
+      }
+
+      if (getSimilarityIdentity(item) !== draftIdentity) {
+        return false
+      }
+
+      const itemDate = getSimilarityDate(item)
+      return itemDate === draftDate || (draftMonth && itemDate.slice(0, 7) === draftMonth)
+    })
+    .slice(0, 3)
+}
+
+export function getBillCycleHistory(items, bill) {
+  if (bill?.type !== 'bill') {
+    return []
+  }
+
+  const identity = getSimilarityIdentity(bill)
+
+  if (!identity) {
+    return []
+  }
+
+  return items
+    .filter((item) => item.type === 'bill' && getSimilarityIdentity(item) === identity)
+    .sort((a, b) => {
+      const aDate = toDate(getSimilarityDate(a))?.getTime() ?? 0
+      const bDate = toDate(getSimilarityDate(b))?.getTime() ?? 0
+      return bDate - aDate
+    })
+    .slice(0, 6)
+}
+
+function normalizeCycleValue(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replaceAll(' ', '_')
+    .replaceAll('-', '_')
+}
+
+function getSimilarityIdentity(item) {
+  if (
+    (['bill', 'subscription', 'expense', 'income'].includes(item.type) && !item.title) ||
+    (item.type === 'vendor' && !item.vendorName && !item.title) ||
+    (item.type === 'insurance' && !item.policyNumber && !item.title) ||
+    (item.type === 'document' && !item.referenceNumber && !item.relatedTo && !item.title) ||
+    (item.type === 'complaint' && !item.complaintId && !item.title)
+  ) {
+    return ''
+  }
+
+  const identityByType = {
+    bill: [item.title, item.category],
+    complaint: [item.complaintId || item.title, item.companyOrDepartment],
+    document: [item.referenceNumber || item.relatedTo || item.title, item.recordType || item.documentType],
+    expense: [item.title, item.category],
+    income: [item.title, item.sourceName || item.category],
+    insurance: [item.policyNumber || item.title, item.insurerName],
+    subscription: [item.title, item.category],
+    vendor: [item.vendorName || item.title, item.serviceType],
+  }
+
+  return (identityByType[item.type] ?? [item.title, item.category])
+    .filter(Boolean)
+    .join('|')
+    .trim()
+    .toLowerCase()
+}
+
+function getSimilarityDate(item) {
+  if (item.type === 'bill' || item.type === 'insurance') {
+    return item.dueDate || item.paidDate || item.createdAt || ''
+  }
+
+  if (item.type === 'vendor') {
+    return item.paymentDate || item.dueDate || item.paidDate || item.createdAt || ''
+  }
+
+  if (item.type === 'subscription') {
+    return item.renewalDate || item.dueDate || item.paidDate || item.createdAt || ''
+  }
+
+  if (item.type === 'complaint') {
+    return item.dateRaised || item.followUpDate || item.createdAt || ''
+  }
+
+  if (item.type === 'document') {
+    return item.serviceDate || item.documentDate || item.nextServiceDate || item.createdAt || ''
+  }
+
+  return item.date || item.createdAt || ''
+}
+
+function isRecurringDocumentRecord(item) {
+  const recordType = String(item.recordType || item.documentType || '').toLowerCase()
+  const recurringType = ['service', 'maintenance', 'repair', 'amc', 'warranty', 'tax'].some(
+    (keyword) => recordType.includes(keyword),
+  )
+
+  return recurringType && Boolean(getDocumentNextCycleReminder(item).frequency)
+}
+
+function getDocumentNextCycleReminder(item) {
+  const candidates = [
+    {
+      date: item.nextServiceDate || item.serviceDate || item.documentDate,
+      field: 'nextServiceDate',
+      frequency: normalizeCycleValue(item.nextServiceInterval) !== 'none'
+        ? normalizeCycleValue(item.nextServiceInterval)
+        : normalizeCycleValue(item.serviceInterval),
+    },
+    {
+      date: item.expiryDate || item.documentDate,
+      field: 'expiryDate',
+      frequency: normalizeCycleValue(item.expiryInterval),
+    },
+    {
+      date: item.warrantyTill || item.documentDate,
+      field: 'warrantyTill',
+      frequency: normalizeCycleValue(item.warrantyInterval),
+    },
+  ]
+
+  return (
+    candidates.find(
+      (candidate) =>
+        candidate.frequency &&
+        !['one_time', 'as_needed', 'none', 'custom'].includes(candidate.frequency),
+    ) ?? { date: '', field: '', frequency: '' }
+  )
+}
+
+function getNextCycleIdentity(item) {
+  return String(
+    item.vendorName ||
+      item.policyNumber ||
+      item.subscriptionName ||
+      item.relatedTo ||
+      item.title ||
+      '',
+  )
+    .trim()
+    .toLowerCase()
+}
+
+function getNextCycleTargetDate(item) {
+  if (item.type === 'vendor') {
+    return item.paymentDate || item.dueDate || ''
+  }
+
+  if (item.type === 'subscription') {
+    return item.renewalDate || item.dueDate || ''
+  }
+
+  if (item.type === 'document') {
+    return item.nextServiceDate || item.expiryDate || item.warrantyTill || item.dueDate || ''
+  }
+
+  return item.dueDate || ''
+}
 
 export function calculateVendorSettlement(item) {
   const amountDue = Number(item.amountDue || item.usualAmount || item.monthlyAmount || item.amount || 0)
