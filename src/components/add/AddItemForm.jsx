@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  billCategories,
-  expenseCategories,
+  BILL_CATEGORIES,
+  EXPENSE_CATEGORIES,
   getStatusMeta,
   incomeCategories,
   indiaFirstCategories,
   paymentModes,
 } from '../../data/lifeAdminConstants'
 import { getItemTypeMeta } from '../../data/itemTypes'
+import FormInfoPanel from '../common/FormInfoPanel'
 import {
   calculateVendorSettlement,
   formatDisplayDate,
@@ -377,6 +378,10 @@ function AddItemForm({
 
         {selectedType === 'bill' && (
           <>
+            <FormInfoPanel title="What is a Bill?">
+              Use Bills for payments that have a due date, such as electricity, EMI,
+              broadband, tax or maintenance. Paid bills can also be added to Money.
+            </FormInfoPanel>
             <Field label="Title" error={showError('title')}>
               <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="Electricity bill" />
             </Field>
@@ -399,7 +404,7 @@ function AddItemForm({
               </SelectInput>
             </Field>
             <CommonMoneyFields
-              categoryOptions={billCategories}
+              categoryOptions={BILL_CATEGORIES}
               form={form}
               updateField={updateField}
               statusOptions={statusOptions}
@@ -584,6 +589,10 @@ function AddItemForm({
 
         {selectedType === 'expense' && (
           <>
+            <FormInfoPanel title="What is an Expense?">
+              Use Expenses for money already spent, such as groceries, fuel, eating out,
+              shopping or medical costs.
+            </FormInfoPanel>
             <Field label="Title" error={showError('title')}>
               <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="Grocery run" />
             </Field>
@@ -596,7 +605,7 @@ function AddItemForm({
               </Field>
             </TwoFields>
             <CommonMoneyFields
-              categoryOptions={expenseCategories}
+              categoryOptions={EXPENSE_CATEGORIES}
               form={form}
               updateField={updateField}
               statusOptions={statusOptions}
@@ -974,14 +983,16 @@ function formatDatePreview(dateString) {
 }
 
 function CategorySelect({ onChange, options = indiaFirstCategories, value }) {
-  const renderedOptions =
-    value && !options.includes(value) ? [value, ...options] : options
+  const hasLegacyValue = Boolean(value && !options.includes(value))
+  const renderedOptions = hasLegacyValue ? [value, ...options] : options
 
   return (
     <SelectInput value={value} onChange={(event) => onChange(event.target.value)}>
       {renderedOptions.map((category) => (
         <option key={category} value={category}>
-          {category}
+          {hasLegacyValue && category === value
+            ? `${category} (Legacy category)`
+            : category}
         </option>
       ))}
     </SelectInput>

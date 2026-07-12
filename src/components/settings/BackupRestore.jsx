@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
 import { itemTypes } from '../../data/itemTypes'
-import { exportLifeItemsBackup } from '../../features/backup/backupReminder'
 import {
   saveLifeItems,
 } from '../../features/lifeItems/lifeItemStorage'
@@ -9,19 +8,11 @@ import SectionCard from '../common/SectionCard'
 
 const supportedTypes = new Set(itemTypes.map((item) => item.id))
 
-function BackupRestore({ onBackupExported, onDataChanged }) {
+function BackupRestore({ onDataChanged }) {
   const fileInputRef = useRef(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [pendingItems, setPendingItems] = useState(null)
-
-  function handleExport() {
-    const result = exportLifeItemsBackup()
-
-    setError('')
-    setSuccess('Backup exported. Next reminder in 15 days.')
-    onBackupExported?.(result)
-  }
 
   function handleImportFile(event) {
     const file = event.target.files?.[0]
@@ -67,19 +58,16 @@ function BackupRestore({ onBackupExported, onDataChanged }) {
   }
 
   return (
-    <SectionCard title="Backup and restore">
+    <SectionCard eyebrow="Bring data back" title="Restore from backup">
       <div className="grid gap-3">
-        <button
-          type="button"
-          onClick={handleExport}
-          className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
-        >
-          Export backup
-        </button>
+        <p className="text-sm leading-6 text-stone-600">
+          Choose a Minutiae JSON backup to replace the data currently stored on
+          this device. You can review the confirmation before anything changes.
+        </p>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-stone-700">
-            Import backup
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.1em] text-stone-500">
+            Backup file
           </span>
           <input
             ref={fileInputRef}

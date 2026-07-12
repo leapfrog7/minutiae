@@ -16,13 +16,13 @@ export const itemTypes = [
     id: 'expense',
     label: 'Expense',
     emoji: itemTypeEmojis.expense,
-    description: 'Daily spending or one-time payment',
+    description: 'Money already spent, such as groceries, fuel, eating out or shopping',
   },
   {
     id: 'bill',
     label: 'Bill',
     emoji: itemTypeEmojis.bill,
-    description: 'Electricity, gas, water, EMI, tax or dues',
+    description: 'Payments with a due date, such as electricity, EMI, tax or broadband',
   },
   {
     id: 'vendor',

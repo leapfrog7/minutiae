@@ -1,7 +1,7 @@
 export { getItemTypeMeta, itemTypes } from './itemTypes'
 export {
-  billCategories,
-  expenseCategories,
+  BILL_CATEGORIES,
+  EXPENSE_CATEGORIES,
   incomeCategories,
   indiaFirstCategories,
   paymentModes,

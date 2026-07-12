@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ActionItemCard from "../components/common/ActionItemCard";
 import EmptyState from "../components/common/EmptyState";
+import FloatingInstallPrompt from "../components/common/FloatingInstallPrompt";
 import ItemDetailSheet from "../components/common/ItemDetailSheet";
 import MarkPaidDialog from "../components/common/MarkPaidDialog";
 import NextReminderPrompt from "../components/common/NextReminderPrompt";
@@ -359,6 +360,8 @@ function HomePage({ onNavigate }) {
         tone={toast?.tone}
         onDismiss={() => setToast(null)}
       />
+
+      <FloatingInstallPrompt />
     </>
   );
 }

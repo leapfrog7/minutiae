@@ -25,7 +25,7 @@ function DataDangerZone({ onDataChanged }) {
   }
 
   return (
-    <SectionCard title="Local data actions">
+    <SectionCard className="border-rose-200/80" eyebrow="Use with care" title="Local data actions">
       <div className="grid gap-2">
         <button
           type="button"

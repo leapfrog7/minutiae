@@ -2,7 +2,7 @@ import SectionCard from '../common/SectionCard'
 
 function AppInfo() {
   return (
-    <SectionCard title="App info">
+    <SectionCard eyebrow="About" title="App info">
       <div className="grid gap-2 text-sm">
         <InfoRow label="App" value="Minutiae" />
         <InfoRow label="Tagline" value="Your household command centre." />

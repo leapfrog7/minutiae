@@ -4,7 +4,10 @@ import ItemDetailSheet from "../components/common/ItemDetailSheet";
 import AppHeader from "../components/layout/AppHeader";
 import MonthRecordGroup from "../components/records/MonthRecordGroup";
 import { getCurrentMonthKey } from "../features/lifeItems/lifeItemHelpers";
-import { groupRecordsByMonthAndDate } from "../features/lifeItems/recordArchiveHelpers";
+import {
+  groupRecordsByMonthAndDate,
+  isVisibleRecord,
+} from "../features/lifeItems/recordArchiveHelpers";
 import { getLifeItems } from "../features/lifeItems/lifeItemStorage";
 
 const searchableFields = [
@@ -64,7 +67,7 @@ const initialVisibleMonthCount = 3;
 const olderMonthBatchSize = 3;
 
 function RecordsPage({ onNavigate }) {
-  const [items, setItems] = useState(() => getLifeItems());
+  const [items, setItems] = useState(() => getLifeItems().filter(isVisibleRecord));
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [selectedItem, setSelectedItem] = useState(null);
@@ -75,7 +78,7 @@ function RecordsPage({ onNavigate }) {
   const [closedMonthKeys, setClosedMonthKeys] = useState(() => new Set());
 
   function refreshItems(nextSelectedItem) {
-    setItems(getLifeItems());
+    setItems(getLifeItems().filter(isVisibleRecord));
     setSelectedItem(nextSelectedItem ?? null);
   }
 

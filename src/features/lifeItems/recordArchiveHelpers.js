@@ -64,6 +64,10 @@ export function getRecordDateKey(item) {
   return getRecordDate(item)
 }
 
+export function isVisibleRecord(item) {
+  return !(item?.type === 'expense' && item.linkedItemId)
+}
+
 export function sortRecordMonths(months) {
   return [...months].sort((a, b) => b.monthKey.localeCompare(a.monthKey))
 }
