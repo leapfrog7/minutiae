@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { calculateVendorSettlement } from '../../features/lifeItems/lifeItemHelpers'
+import { useDialogFocus } from '../../features/ui/useDialogFocus'
 
 function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm }) {
+  const dialogRef = useDialogFocus(onCancel)
   const [recordExpense, setRecordExpense] = useState(!duplicateExpense)
   const isVendor = item?.type === 'vendor'
   const [vendorUpdates, setVendorUpdates] = useState(() => ({
     adjustmentAmount: item?.adjustmentAmount || '',
     advanceAdjusted: item?.advanceAdjusted || '',
     amountPaid: item?.amountPaid || item?.amountDue || item?.amount || item?.monthlyAmount || '',
-    balancePayable: item?.balancePayable || '',
     paymentMode: item?.paymentMode || 'UPI',
   }))
   const settlement = calculateVendorSettlement({
@@ -37,7 +38,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
       aria-modal="true"
       aria-label="Mark as paid"
     >
-      <div className="max-h-[86vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20 md:max-w-xl">
+      <div ref={dialogRef} className="max-h-[86vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20 md:max-w-xl">
         <h2 className="text-base font-bold text-stone-950">Mark as paid?</h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
           Add this payment to Money as an expense too?
@@ -122,6 +123,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
             Cancel
           </button>
           <button
+            data-dialog-initial-focus
             type="button"
             onClick={() =>
               onConfirm({
@@ -132,16 +134,14 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
                       amountPaid: Number(vendorUpdates.amountPaid || 0),
                       adjustmentAmount: Number(vendorUpdates.adjustmentAmount || 0),
                       advanceAdjusted: Number(vendorUpdates.advanceAdjusted || 0),
-                      balancePayable:
-                        vendorUpdates.balancePayable === ''
-                          ? settlement.balancePayable
-                          : Number(vendorUpdates.balancePayable || 0),
+                      balancePayable: settlement.balancePayable,
                       amount: Number(vendorUpdates.amountPaid || item?.amount || 0),
                     }
                   : {},
               })
             }
-            className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white"
+            disabled={isVendor && Number(vendorUpdates.amountPaid || 0) <= 0}
+            className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-stone-300"
           >
             Mark Paid
           </button>

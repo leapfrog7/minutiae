@@ -15,6 +15,7 @@ import {
 } from '../features/lifeItems/lifeItemHelpers'
 import {
   getLifeItems,
+  subscribeToLifeItems,
 } from '../features/lifeItems/lifeItemStorage'
 
 const statLabels = [
@@ -31,12 +32,12 @@ const statLabels = [
 ]
 
 function SettingsPage({ onNavigate }) {
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(getLifeItems)
   const [backupMessage, setBackupMessage] = useState('')
   const [backupRefreshKey, setBackupRefreshKey] = useState(0)
 
   useEffect(() => {
-    setItems(getLifeItems())
+    return subscribeToLifeItems(setItems)
   }, [])
 
   function refreshItems() {

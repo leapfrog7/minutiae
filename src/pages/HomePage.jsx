@@ -39,6 +39,7 @@ import {
 import {
   getLifeItems,
   markLifeItemPaid,
+  subscribeToLifeItems,
   updateLifeItem,
 } from "../features/lifeItems/lifeItemStorage";
 
@@ -50,10 +51,23 @@ function HomePage({ onNavigate }) {
   const [pendingNextReminderItem, setPendingNextReminderItem] = useState(null);
   const [preview, setPreview] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [backupRefreshKey, setBackupRefreshKey] = useState(0);
+  const [, setBackupRefreshKey] = useState(0);
   const [toast, setToast] = useState(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(
     () => localStorage.getItem(onboardingDismissedKey) === "yes",
+  );
+
+  useEffect(
+    () =>
+      subscribeToLifeItems((nextItems) => {
+        setItems(nextItems);
+        setSelectedItem((current) =>
+          current
+            ? nextItems.find((item) => item.id === current.id) ?? null
+            : null,
+        );
+      }),
+    [],
   );
 
   function refreshItems(nextSelectedItem) {
@@ -170,10 +184,7 @@ function HomePage({ onNavigate }) {
   ];
   const hasItems = items.length > 0;
   const shouldShowOnboarding = items.length < 3 && !onboardingDismissed;
-  const backupState = useMemo(
-    () => getBackupReminderState(items.length),
-    [items.length, backupRefreshKey],
-  );
+  const backupState = getBackupReminderState(items.length);
 
   useEffect(() => {
     function handleInternalBack(event) {

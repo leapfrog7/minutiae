@@ -7,6 +7,18 @@ import ConfirmDialog from '../common/ConfirmDialog'
 import SectionCard from '../common/SectionCard'
 
 const supportedTypes = new Set(itemTypes.map((item) => item.id))
+const numericFields = [
+  'amount',
+  'premiumAmount',
+  'usualAmount',
+  'monthlyAmount',
+  'amountDue',
+  'amountPaid',
+  'adjustmentAmount',
+  'advanceGiven',
+  'advanceAdjusted',
+  'balancePayable',
+]
 
 function BackupRestore({ onDataChanged }) {
   const fileInputRef = useRef(null)
@@ -51,10 +63,16 @@ function BackupRestore({ onDataChanged }) {
   }
 
   function confirmImport() {
-    saveLifeItems(pendingItems)
-    onDataChanged()
-    setSuccess(`Imported ${pendingItems.length} items.`)
-    setPendingItems(null)
+    try {
+      saveLifeItems(pendingItems)
+      onDataChanged()
+      setError('')
+      setSuccess(`Imported ${pendingItems.length} items.`)
+      setPendingItems(null)
+    } catch {
+      setError('Import could not be saved. Your existing data is unchanged.')
+      setSuccess('')
+    }
   }
 
   return (
@@ -119,9 +137,67 @@ function validateItems(items) {
     )
   })
 
-  return invalidItem
-    ? 'Each item needs id, supported type, and title or vendor name.'
-    : ''
+  if (invalidItem) {
+    return 'Each item needs id, supported type, and title or vendor name.'
+  }
+
+  const ids = new Set()
+  const duplicateId = items.find((item) => {
+    if (ids.has(item.id)) {
+      return true
+    }
+
+    ids.add(item.id)
+    return false
+  })
+
+  if (duplicateId) {
+    return `Backup contains a duplicate item ID: ${duplicateId.id}.`
+  }
+
+  const invalidAmountItem = items.find((item) =>
+    numericFields.some(
+      (field) =>
+        item[field] !== undefined &&
+        item[field] !== '' &&
+        (!Number.isFinite(Number(item[field])) || Number(item[field]) < 0),
+    ),
+  )
+
+  if (invalidAmountItem) {
+    return `Backup contains an invalid amount for ${invalidAmountItem.title || invalidAmountItem.vendorName}.`
+  }
+
+  const orphanedExpense = items.find(
+    (item) =>
+      item.type === 'expense' &&
+      item.linkedItemId &&
+      !ids.has(item.linkedItemId),
+  )
+
+  if (orphanedExpense) {
+    return `Linked expense has no source item: ${orphanedExpense.title}.`
+  }
+
+  const linkedSourceIds = new Set()
+  const duplicateLinkedExpense = items.find((item) => {
+    if (item.type !== 'expense' || !item.linkedItemId) {
+      return false
+    }
+
+    if (linkedSourceIds.has(item.linkedItemId)) {
+      return true
+    }
+
+    linkedSourceIds.add(item.linkedItemId)
+    return false
+  })
+
+  if (duplicateLinkedExpense) {
+    return `Backup contains more than one linked expense for ${duplicateLinkedExpense.title}.`
+  }
+
+  return ''
 }
 
 export default BackupRestore

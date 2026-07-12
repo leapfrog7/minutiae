@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AgendaGroup from "../components/calendar/AgendaGroup";
 import EmptyState from "../components/common/EmptyState";
 import ItemDetailSheet from "../components/common/ItemDetailSheet";
@@ -20,6 +20,7 @@ import {
 import {
   getLifeItems,
   markLifeItemPaid,
+  subscribeToLifeItems,
   updateLifeItem,
 } from "../features/lifeItems/lifeItemStorage";
 
@@ -40,6 +41,19 @@ function CalendarPage({ onNavigate }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedType, setSelectedType] = useState("all");
   const [toast, setToast] = useState(null);
+
+  useEffect(
+    () =>
+      subscribeToLifeItems((nextItems) => {
+        setItems(nextItems);
+        setSelectedItem((current) =>
+          current
+            ? nextItems.find((item) => item.id === current.id) ?? null
+            : null,
+        );
+      }),
+    [],
+  );
 
   function refreshItems(nextSelectedItem) {
     setItems(getLifeItems());
@@ -129,6 +143,7 @@ function CalendarPage({ onNavigate }) {
               <button
                 key={option.id}
                 type="button"
+                aria-pressed={isActive}
                 onClick={() => setSelectedType(option.id)}
                 className={`mb-2 rounded-full px-3 py-2 text-xs font-bold ${
                   isActive

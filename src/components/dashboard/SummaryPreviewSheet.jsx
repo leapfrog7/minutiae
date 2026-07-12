@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import ItemCard from '../common/ItemCard'
+import { useDialogFocus } from '../../features/ui/useDialogFocus'
 
 function SummaryPreviewSheet({
   count,
@@ -11,6 +12,7 @@ function SummaryPreviewSheet({
   suspendBack = false,
   title,
 }) {
+  const dialogRef = useDialogFocus(onClose)
   useEffect(() => {
     function handleInternalBack(event) {
       if (suspendBack) {
@@ -29,8 +31,11 @@ function SummaryPreviewSheet({
     <>
       <div className="fixed inset-0 z-20 bg-stone-950/30" onClick={onClose} />
       <aside
+        ref={dialogRef}
         className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[82vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20 md:inset-x-4 md:bottom-auto md:top-1/2 md:max-h-[82vh] md:max-w-xl md:-translate-y-1/2 md:rounded-3xl md:p-5"
         aria-label={title}
+        aria-modal="true"
+        role="dialog"
       >
         <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-stone-300 md:hidden" />
         <div className="flex items-start justify-between gap-3">
@@ -44,6 +49,7 @@ function SummaryPreviewSheet({
             </p>
           </div>
           <button
+            data-dialog-initial-focus
             type="button"
             onClick={onClose}
             className="rounded-full bg-stone-200 px-3 py-2 text-xs font-bold text-stone-700"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDialogFocus } from '../../features/ui/useDialogFocus'
 
 const installDismissedKey = 'minutiae-install-prompt-dismissed'
 
@@ -30,6 +31,7 @@ function FloatingInstallPrompt() {
       !isStandalone() &&
       localStorage.getItem(installDismissedKey) !== 'yes',
   )
+  const dialogRef = useDialogFocus(dismiss, instructionsOpen)
 
   useEffect(() => {
     function handleBeforeInstallPrompt(event) {
@@ -52,6 +54,22 @@ function FloatingInstallPrompt() {
       window.removeEventListener('appinstalled', handleInstalled)
     }
   }, [])
+
+  useEffect(() => {
+    if (!instructionsOpen) {
+      return undefined
+    }
+
+    function handleInternalBack(event) {
+      event.preventDefault()
+      localStorage.setItem(installDismissedKey, 'yes')
+      setVisible(false)
+      setInstructionsOpen(false)
+    }
+
+    window.addEventListener('minutiae:back', handleInternalBack)
+    return () => window.removeEventListener('minutiae:back', handleInternalBack)
+  }, [instructionsOpen])
 
   function dismiss() {
     localStorage.setItem(installDismissedKey, 'yes')
@@ -104,6 +122,7 @@ function FloatingInstallPrompt() {
       {instructionsOpen && (
         <div className="fixed inset-0 z-50 flex items-end bg-stone-950/40 p-3 backdrop-blur-[2px] sm:items-center sm:justify-center">
           <section
+            ref={dialogRef}
             className="w-full max-w-sm rounded-3xl bg-white p-4 shadow-2xl"
             role="dialog"
             aria-modal="true"
@@ -119,6 +138,7 @@ function FloatingInstallPrompt() {
                 </h2>
               </div>
               <button
+                data-dialog-initial-focus
                 type="button"
                 onClick={dismiss}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xl text-stone-600"

@@ -1,10 +1,11 @@
 import {
   formatAmount,
   formatDisplayDate,
+  getDateInputValue,
   getMonthLabel,
 } from './lifeItemHelpers'
 
-const todayKey = () => new Date().toISOString().slice(0, 10)
+const todayKey = () => getDateInputValue()
 
 const toDate = (value) => {
   if (!value) {
@@ -26,6 +27,13 @@ export function getRecordDate(item) {
     return todayKey()
   }
 
+  if (item.type === 'income' && item.status === 'received') {
+    return (
+      firstValidDate(item, ['receivedDate', 'date', 'createdAt']) ||
+      todayKey()
+    ).slice(0, 10)
+  }
+
   const fieldsByType = {
     bill: ['paidDate', 'dueDate', 'createdAt'],
     complaint: [
@@ -43,7 +51,7 @@ export function getRecordDate(item) {
       'createdAt',
     ],
     expense: ['date', 'paidDate', 'createdAt'],
-    income: ['date', 'receivedDate', 'createdAt'],
+    income: ['date', 'createdAt'],
     insurance: ['paidDate', 'dueDate', 'createdAt'],
     subscription: ['paidDate', 'renewalDate', 'dueDate', 'createdAt'],
     vendor: ['paidDate', 'paymentDate', 'dueDate', 'createdAt'],

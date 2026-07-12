@@ -1,4 +1,5 @@
-import BottomNav, { navItems } from './BottomNav'
+import { navItems } from '../../data/navigation'
+import BottomNav from './BottomNav'
 
 function AppShell({ activePage, children, onNavigate }) {
   const showBottomNav = activePage !== 'settings'

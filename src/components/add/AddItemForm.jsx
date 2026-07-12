@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { cloneElement, useId, useMemo, useState } from 'react'
 import {
   BILL_CATEGORIES,
   EXPENSE_CATEGORIES,
@@ -12,12 +12,13 @@ import FormInfoPanel from '../common/FormInfoPanel'
 import {
   calculateVendorSettlement,
   formatDisplayDate,
+  getDateInputValue,
   getDuplicateWarningItems,
   hasLinkedExpense,
 } from '../../features/lifeItems/lifeItemHelpers'
 import { getLifeItems } from '../../features/lifeItems/lifeItemStorage'
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => getDateInputValue()
 
 const defaultValuesByType = {
   subscription: {
@@ -30,6 +31,7 @@ const defaultValuesByType = {
     cancelBeforeDate: '',
     category: 'Subscription',
     status: 'pending',
+    addToMoney: 'yes',
     notes: '',
   },
   bill: {
@@ -54,6 +56,7 @@ const defaultValuesByType = {
     frequency: 'yearly',
     paymentMode: 'UPI',
     status: 'unpaid',
+    addToMoney: 'yes',
     category: 'Insurance',
     notes: '',
   },
@@ -223,11 +226,18 @@ const reminderIntervalOptions = [
 const toNumber = (value) => (value === '' ? 0 : Number(value))
 
 function Field({ children, className = '', error, label }) {
+  const errorId = useId()
+
   return (
     <label className={`block ${className}`}>
       <span className="text-xs font-semibold text-stone-700">{label}</span>
-      <div className="mt-1">{children}</div>
-      {error && <p className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
+      <div className="mt-1">
+        {cloneElement(children, {
+          'aria-describedby': error ? errorId : undefined,
+          'aria-invalid': error ? true : undefined,
+        })}
+      </div>
+      {error && <p id={errorId} className="mt-1 text-xs font-semibold text-rose-600">{error}</p>}
     </label>
   )
 }
@@ -278,11 +288,6 @@ function AddItemForm({
   }, [form, selectedType])
   const statusOptions = statusOptionsByType[selectedType] ?? ['pending']
 
-  useEffect(() => {
-    setForm(initialForm)
-    setSubmitted(false)
-  }, [initialForm])
-
   function updateField(field, value) {
     setForm((current) => {
       const nextForm = { ...current, [field]: value }
@@ -315,7 +320,15 @@ function AddItemForm({
       return
     }
 
-    onSave(buildLifeItem(selectedType, form), getSaveOptions(selectedType, form))
+    const saved = onSave(
+      buildLifeItem(selectedType, form),
+      getSaveOptions(selectedType, form),
+    )
+
+    if (saved === false) {
+      return
+    }
+
     setForm(initialForm)
     setSubmitted(false)
   }
@@ -373,6 +386,13 @@ function AddItemForm({
             <Field label="Cancel before">
               <TextInput type="date" value={form.cancelBeforeDate} onChange={(event) => updateField('cancelBeforeDate', event.target.value)} />
             </Field>
+            <AddToMoneyOption
+              duplicateExpense={hasExistingLinkedExpense(initialItem)}
+              itemType="subscription"
+              status={form.status}
+              value={form.addToMoney}
+              onChange={(value) => updateField('addToMoney', value)}
+            />
           </>
         )}
 
@@ -456,6 +476,13 @@ function AddItemForm({
                 <PaymentSelect value={form.paymentMode} onChange={(value) => updateField('paymentMode', value)} />
               </Field>
             </TwoFields>
+            <AddToMoneyOption
+              duplicateExpense={hasExistingLinkedExpense(initialItem)}
+              itemType="insurance premium"
+              status={form.status}
+              value={form.addToMoney}
+              onChange={(value) => updateField('addToMoney', value)}
+            />
           </>
         )}
 
@@ -971,7 +998,7 @@ function addIntervalToDate(dateString, interval) {
     date.setFullYear(date.getFullYear() + amount)
   }
 
-  return date.toISOString().slice(0, 10)
+  return getDateInputValue(date)
 }
 
 function formatDatePreview(dateString) {
@@ -1197,7 +1224,8 @@ function validateForm(type, form) {
 function getSaveOptions(type, form) {
   return {
     recordExpense:
-      ((['bill', 'vendor'].includes(type) && form.status === 'paid') ||
+      ((['bill', 'vendor', 'subscription', 'insurance'].includes(type) &&
+        form.status === 'paid') ||
         (type === 'document' &&
           ['paid', 'completed'].includes(form.status) &&
           Number(form.amount || 0) > 0)) &&
@@ -1207,8 +1235,11 @@ function getSaveOptions(type, form) {
 
 function buildLifeItem(type, form) {
   if (type === 'subscription') {
+    const itemForm = { ...form }
+    delete itemForm.addToMoney
+
     return {
-      ...form,
+      ...itemForm,
       type,
       amount: toNumber(form.amount),
       autoRenewal: form.autoRenewal === 'yes',
@@ -1218,7 +1249,8 @@ function buildLifeItem(type, form) {
   }
 
   if (type === 'bill') {
-    const { addToMoney, ...itemForm } = form
+    const itemForm = { ...form }
+    delete itemForm.addToMoney
 
     return {
       ...itemForm,
@@ -1230,8 +1262,11 @@ function buildLifeItem(type, form) {
   }
 
   if (type === 'insurance') {
+    const itemForm = { ...form }
+    delete itemForm.addToMoney
+
     return {
-      ...form,
+      ...itemForm,
       type,
       amount: toNumber(form.premiumAmount),
       premiumAmount: toNumber(form.premiumAmount),
@@ -1247,8 +1282,7 @@ function buildLifeItem(type, form) {
       amountDue,
       amountPaid,
     })
-    const balancePayable =
-      form.balancePayable === '' ? settlement.balancePayable : toNumber(form.balancePayable)
+    const balancePayable = settlement.balancePayable
 
     return {
       ...form,
@@ -1336,8 +1370,12 @@ function getInitialForm(type, initialItem) {
   }
 
   if (type === 'subscription') {
+    const duplicateExpense = hasExistingLinkedExpense(initialItem)
+
     return {
       ...baseForm,
+      addToMoney:
+        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
       autoRenewal: initialItem.autoRenewal ? 'yes' : 'no',
       billingCycle: normalizeOption(initialItem.billingCycle, 'monthly'),
     }
@@ -1356,8 +1394,12 @@ function getInitialForm(type, initialItem) {
   }
 
   if (type === 'insurance') {
+    const duplicateExpense = hasExistingLinkedExpense(initialItem)
+
     return {
       ...baseForm,
+      addToMoney:
+        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
       premiumAmount: initialItem.premiumAmount || initialItem.amount || '',
       frequency: normalizeOption(initialItem.frequency, 'yearly'),
     }

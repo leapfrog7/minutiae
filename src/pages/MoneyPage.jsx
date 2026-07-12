@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CollapsibleSection from "../components/common/CollapsibleSection";
 import EmptyState from "../components/common/EmptyState";
 import ItemCard from "../components/common/ItemCard";
@@ -23,7 +23,10 @@ import {
   getSavingsRate,
   getUnpaidExpenseItemsForMonth,
 } from "../features/lifeItems/lifeItemHelpers";
-import { getLifeItems } from "../features/lifeItems/lifeItemStorage";
+import {
+  getLifeItems,
+  subscribeToLifeItems,
+} from "../features/lifeItems/lifeItemStorage";
 
 const obligationGroups = [
   ["subscription", "Subscriptions"],
@@ -36,6 +39,19 @@ function MoneyPage({ onNavigate }) {
   const [items, setItems] = useState(() => getLifeItems());
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
+
+  useEffect(
+    () =>
+      subscribeToLifeItems((nextItems) => {
+        setItems(nextItems);
+        setSelectedItem((current) =>
+          current
+            ? nextItems.find((item) => item.id === current.id) ?? null
+            : null,
+        );
+      }),
+    [],
+  );
 
   function refreshItems(nextSelectedItem) {
     setItems(getLifeItems());

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EmptyState from "../components/common/EmptyState";
 import ItemDetailSheet from "../components/common/ItemDetailSheet";
 import AppHeader from "../components/layout/AppHeader";
@@ -8,7 +8,10 @@ import {
   groupRecordsByMonthAndDate,
   isVisibleRecord,
 } from "../features/lifeItems/recordArchiveHelpers";
-import { getLifeItems } from "../features/lifeItems/lifeItemStorage";
+import {
+  getLifeItems,
+  subscribeToLifeItems,
+} from "../features/lifeItems/lifeItemStorage";
 
 const searchableFields = [
   "title",
@@ -76,6 +79,22 @@ function RecordsPage({ onNavigate }) {
   );
   const [openMonthKeys, setOpenMonthKeys] = useState(() => new Set());
   const [closedMonthKeys, setClosedMonthKeys] = useState(() => new Set());
+
+  useEffect(
+    () =>
+      subscribeToLifeItems((nextItems) =>
+        {
+          const visibleItems = nextItems.filter(isVisibleRecord);
+          setItems(visibleItems);
+          setSelectedItem((current) =>
+            current
+              ? visibleItems.find((item) => item.id === current.id) ?? null
+              : null,
+          );
+        },
+      ),
+    [],
+  );
 
   function refreshItems(nextSelectedItem) {
     setItems(getLifeItems().filter(isVisibleRecord));
@@ -229,6 +248,7 @@ function RecordsPage({ onNavigate }) {
                 <button
                   key={option.id}
                   type="button"
+                  aria-pressed={isActive}
                   onClick={() => setSelectedType(option.id)}
                   className={`rounded-full px-3 py-2 text-xs font-bold ${
                     isActive

@@ -12,6 +12,7 @@ import {
   createUpiPaymentLink,
   getQuickStatusAction,
   getBillCycleHistory,
+  getDateInputValue,
   getRelevantDate,
   hasLinkedExpense,
   shouldOfferRecordExpense,
@@ -34,8 +35,10 @@ import MarkPaidDialog from './MarkPaidDialog'
 import NextReminderPrompt from './NextReminderPrompt'
 import StatusBadge from './StatusBadge'
 import Toast from './Toast'
+import { useDialogFocus } from '../../features/ui/useDialogFocus'
 
 function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
+  const dialogRef = useDialogFocus(onClose, Boolean(item))
   const [isEditing, setIsEditing] = useState(false)
   const [showPaidConfirm, setShowPaidConfirm] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -46,6 +49,10 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   useEffect(() => {
     function handleInternalBack(event) {
       if (!item) {
+        return
+      }
+
+      if (pendingNextReminderItem) {
         return
       }
 
@@ -71,7 +78,14 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
 
     window.addEventListener('minutiae:back', handleInternalBack)
     return () => window.removeEventListener('minutiae:back', handleInternalBack)
-  }, [isEditing, item, onClose, showConfirm, showPaidConfirm])
+  }, [
+    isEditing,
+    item,
+    onClose,
+    pendingNextReminderItem,
+    showConfirm,
+    showPaidConfirm,
+  ])
 
   if (!item) {
     return null
@@ -105,7 +119,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
 
     const updates =
       item.type === 'income' && quickAction.status === 'received'
-        ? { status: quickAction.status, receivedDate: new Date().toISOString().slice(0, 10) }
+        ? { status: quickAction.status, receivedDate: getDateInputValue() }
         : { status: quickAction.status }
     const updatedItem = updateLifeItem(item.id, updates)
     offerNextReminder(updatedItem)
@@ -125,20 +139,29 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   }
 
   function handleEditSave(updates, options) {
-    const { expenseCreated, updatedItem } = updateLifeItemWithLinkedExpense(
-      item.id,
-      updates,
-      options,
-    )
-    setIsEditing(false)
-    setToast({
-      message: expenseCreated ? 'Changes saved and added to Money' : 'Changes saved',
-      tone: 'success',
-    })
-    if (movedToRecurringDoneStatus(item, updatedItem)) {
-      offerNextReminder(updatedItem)
+    try {
+      const { expenseCreated, updatedItem } = updateLifeItemWithLinkedExpense(
+        item.id,
+        updates,
+        options,
+      )
+      setIsEditing(false)
+      setToast({
+        message: expenseCreated ? 'Changes saved and added to Money' : 'Changes saved',
+        tone: 'success',
+      })
+      if (movedToRecurringDoneStatus(item, updatedItem)) {
+        offerNextReminder(updatedItem)
+      }
+      onItemUpdated(updatedItem)
+      return true
+    } catch {
+      setToast({
+        message: 'Changes could not be saved. Your form is still open.',
+        tone: 'error',
+      })
+      return false
     }
-    onItemUpdated(updatedItem)
   }
 
   function offerNextReminder(updatedItem) {
@@ -166,9 +189,17 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
   }
 
   function handleDelete() {
-    deleteLifeItem(item.id)
-    setShowConfirm(false)
-    onItemDeleted(item.id)
+    try {
+      deleteLifeItem(item.id)
+      setShowConfirm(false)
+      onItemDeleted(item.id)
+    } catch {
+      setShowConfirm(false)
+      setToast({
+        message: 'Delete failed. Your item is still saved.',
+        tone: 'error',
+      })
+    }
   }
 
   function handleCopy(value, label) {
@@ -195,13 +226,17 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
     <>
       <div className="fixed inset-0 z-20 bg-stone-950/30" onClick={onClose} />
       <aside
+        ref={dialogRef}
         className="fixed inset-x-0 bottom-0 z-20 mx-auto max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-stone-50 p-4 shadow-2xl shadow-stone-950/20 md:inset-x-4 md:bottom-auto md:top-1/2 md:max-h-[86vh] md:max-w-2xl md:-translate-y-1/2 md:rounded-3xl md:p-5"
         aria-label="Item details"
+        aria-modal="true"
+        role="dialog"
       >
         <div className="mx-auto mb-3 h-1 w-12 rounded-full bg-stone-300 md:hidden" />
 
         {isEditing ? (
           <AddItemForm
+            key={item.id}
             mode="edit"
             selectedType={item.type}
             initialItem={item}
@@ -220,6 +255,7 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
                 </h2>
               </div>
               <button
+                data-dialog-initial-focus
                 type="button"
                 onClick={onClose}
                 className="rounded-full bg-stone-200 px-3 py-2 text-xs font-bold text-stone-700"

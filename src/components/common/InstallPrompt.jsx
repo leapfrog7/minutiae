@@ -10,12 +10,10 @@ function isStandalone() {
 
 function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null)
-  const [isInstalled, setIsInstalled] = useState(false)
+  const [isInstalled, setIsInstalled] = useState(isStandalone)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    setIsInstalled(isStandalone())
-
     function handleBeforeInstallPrompt(event) {
       event.preventDefault()
 

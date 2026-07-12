@@ -9,8 +9,15 @@ import {
 } from './lifeItemHelpers'
 
 const STORAGE_KEY = 'minutiae-life-items'
+const CORRUPT_STORAGE_BACKUP_KEY = 'minutiae-life-items-corrupt-backup'
+const ITEMS_CHANGED_EVENT = 'minutiae:life-items-changed'
 
-const toDateInput = (date) => date.toISOString().slice(0, 10)
+const toDateInput = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 const addDays = (days) => {
   const date = new Date()
@@ -395,15 +402,54 @@ export function getLifeItems() {
   }
 
   try {
-    return JSON.parse(storedItems)
+    const parsedItems = JSON.parse(storedItems)
+
+    if (!Array.isArray(parsedItems)) {
+      preserveCorruptStorage(storedItems)
+      return []
+    }
+
+    return parsedItems
   } catch {
+    preserveCorruptStorage(storedItems)
     return []
+  }
+}
+
+function preserveCorruptStorage(storedItems) {
+  try {
+    if (!localStorage.getItem(CORRUPT_STORAGE_BACKUP_KEY)) {
+      localStorage.setItem(CORRUPT_STORAGE_BACKUP_KEY, storedItems)
+    }
+  } catch {
+    // Reading remains available even when the browser refuses another write.
   }
 }
 
 export function saveLifeItems(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+  window.dispatchEvent(new CustomEvent(ITEMS_CHANGED_EVENT))
   return items
+}
+
+export function subscribeToLifeItems(onChange) {
+  function handleLocalChange() {
+    onChange(getLifeItems())
+  }
+
+  function handleStorageChange(event) {
+    if (event.key === STORAGE_KEY) {
+      handleLocalChange()
+    }
+  }
+
+  window.addEventListener(ITEMS_CHANGED_EVENT, handleLocalChange)
+  window.addEventListener('storage', handleStorageChange)
+
+  return () => {
+    window.removeEventListener(ITEMS_CHANGED_EVENT, handleLocalChange)
+    window.removeEventListener('storage', handleStorageChange)
+  }
 }
 
 export function addLifeItem(item) {
@@ -472,22 +518,18 @@ export function updateLifeItemWithLinkedExpense(
     return updatedItem
   })
   const duplicateExpense = updatedItem ? hasLinkedExpense(currentItems, updatedItem) : false
-  const expenseDraft =
-    recordExpense && updatedItem && !duplicateExpense && shouldOfferRecordExpense(updatedItem, currentItems)
-      ? createExpenseFromSourceItem(
-          updatedItem,
-          updatedItem.type === 'document'
-            ? undefined
-            : updatedItem.paidDate || getDateInputValue(),
-        )
-      : null
-  const expenseItem = expenseDraft ? withTimestamps(expenseDraft, timestamp) : null
+  const reconciliation = reconcileLinkedExpense(
+    nextItems,
+    updatedItem,
+    timestamp,
+    { createIfMissing: recordExpense },
+  )
 
-  saveLifeItems(expenseItem ? [expenseItem, ...nextItems] : nextItems)
+  saveLifeItems(reconciliation.items)
   return {
     duplicateSkipped: recordExpense && duplicateExpense,
-    expenseCreated: Boolean(expenseItem),
-    expenseItem,
+    expenseCreated: reconciliation.created,
+    expenseItem: reconciliation.expenseItem,
     updatedItem,
   }
 }
@@ -503,13 +545,6 @@ export function markLifeItemPaid(item, { recordExpense = false, updates = {} } =
     paidDate,
   }
   const duplicateExpense = hasLinkedExpense(currentItems, sourceForExpense)
-  const expenseDraft =
-    recordExpense && !duplicateExpense
-      ? createExpenseFromSourceItem(sourceForExpense, paidDate)
-      : null
-  const expenseItem = expenseDraft
-    ? withTimestamps(expenseDraft, timestamp)
-    : null
   let updatedItem = null
   const nextItems = currentItems.map((currentItem) => {
     if (currentItem.id !== item.id) {
@@ -526,13 +561,80 @@ export function markLifeItemPaid(item, { recordExpense = false, updates = {} } =
     return updatedItem
   })
 
-  saveLifeItems(expenseItem ? [expenseItem, ...nextItems] : nextItems)
+  const reconciliation = reconcileLinkedExpense(
+    nextItems,
+    updatedItem,
+    timestamp,
+    { createIfMissing: recordExpense },
+  )
+
+  saveLifeItems(reconciliation.items)
 
   return {
     duplicateSkipped: recordExpense && duplicateExpense,
-    expenseCreated: Boolean(expenseItem),
-    expenseItem,
+    expenseCreated: reconciliation.created,
+    expenseItem: reconciliation.expenseItem,
     updatedItem,
+  }
+}
+
+function reconcileLinkedExpense(
+  items,
+  sourceItem,
+  timestamp,
+  { createIfMissing = false } = {},
+) {
+  if (!sourceItem) {
+    return { created: false, expenseItem: null, items }
+  }
+
+  const linkedExpenses = items.filter(
+    (item) => item.type === 'expense' && item.linkedItemId === sourceItem.id,
+  )
+  const existingExpense = linkedExpenses[0]
+  const itemsWithoutExisting = existingExpense
+    ? items.filter(
+        (item) =>
+          !(item.type === 'expense' && item.linkedItemId === sourceItem.id),
+      )
+    : items
+  const canHaveExpense = shouldOfferRecordExpense(
+    sourceItem,
+    itemsWithoutExisting,
+  )
+
+  if (!canHaveExpense) {
+    return {
+      created: false,
+      expenseItem: null,
+      items: existingExpense ? itemsWithoutExisting : items,
+    }
+  }
+
+  if (!existingExpense && !createIfMissing) {
+    return { created: false, expenseItem: null, items }
+  }
+
+  const expenseDraft = createExpenseFromSourceItem(
+    sourceItem,
+    sourceItem.type === 'document'
+      ? undefined
+      : sourceItem.paidDate || getDateInputValue(),
+  )
+  const expenseItem = existingExpense
+    ? {
+        ...existingExpense,
+        ...expenseDraft,
+        id: existingExpense.id,
+        createdAt: existingExpense.createdAt,
+        updatedAt: timestamp,
+      }
+    : withTimestamps(expenseDraft, timestamp)
+
+  return {
+    created: !existingExpense,
+    expenseItem,
+    items: [expenseItem, ...itemsWithoutExisting],
   }
 }
 
@@ -607,7 +709,9 @@ export function snoozeLifeItem(item, days) {
 }
 
 export function deleteLifeItem(id) {
-  const nextItems = getLifeItems().filter((item) => item.id !== id)
+  const nextItems = getLifeItems().filter(
+    (item) => item.id !== id && item.linkedItemId !== id,
+  )
   saveLifeItems(nextItems)
   return nextItems
 }

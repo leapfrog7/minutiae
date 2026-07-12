@@ -1,6 +1,13 @@
 import { getItemTypeMeta } from '../../data/itemTypes'
 
-const inactiveStatuses = new Set(['paid', 'completed', 'archived', 'resolved', 'closed'])
+const inactiveStatuses = new Set([
+  'paid',
+  'completed',
+  'received',
+  'archived',
+  'resolved',
+  'closed',
+])
 const expenseSourceTypes = new Set(['bill', 'subscription', 'vendor', 'insurance', 'document'])
 
 const toDate = (value) => {
@@ -35,7 +42,27 @@ const addDays = (date, days) => {
   return nextDate
 }
 
-const toDateInput = (date) => date.toISOString().slice(0, 10)
+const toDateInput = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const addMonthsClamped = (date, months) => {
+  const nextDate = new Date(date)
+  const targetDay = nextDate.getDate()
+
+  nextDate.setDate(1)
+  nextDate.setMonth(nextDate.getMonth() + months)
+  const lastDay = new Date(
+    nextDate.getFullYear(),
+    nextDate.getMonth() + 1,
+    0,
+  ).getDate()
+  nextDate.setDate(Math.min(targetDay, lastDay))
+  return nextDate
+}
 
 const monthKeyFromDateValue = (dateValue) => {
   const date = toDate(dateValue)
@@ -419,37 +446,37 @@ export function getNextCycleDate(dateString, frequency) {
     return null
   }
 
-  const nextDate = new Date(baseDate)
+  let nextDate = new Date(baseDate)
 
   if (normalizedFrequency === 'weekly') {
     nextDate.setDate(nextDate.getDate() + 7)
   } else if (normalizedFrequency === '3m') {
-    nextDate.setMonth(nextDate.getMonth() + 3)
+    nextDate = addMonthsClamped(nextDate, 3)
   } else if (normalizedFrequency === '6m') {
-    nextDate.setMonth(nextDate.getMonth() + 6)
+    nextDate = addMonthsClamped(nextDate, 6)
   } else if (normalizedFrequency === '9m') {
-    nextDate.setMonth(nextDate.getMonth() + 9)
+    nextDate = addMonthsClamped(nextDate, 9)
   } else if (normalizedFrequency === '1y') {
-    nextDate.setFullYear(nextDate.getFullYear() + 1)
+    nextDate = addMonthsClamped(nextDate, 12)
   } else if (normalizedFrequency === '2y') {
-    nextDate.setFullYear(nextDate.getFullYear() + 2)
+    nextDate = addMonthsClamped(nextDate, 24)
   } else if (normalizedFrequency === '3y') {
-    nextDate.setFullYear(nextDate.getFullYear() + 3)
+    nextDate = addMonthsClamped(nextDate, 36)
   } else if (normalizedFrequency === '5y') {
-    nextDate.setFullYear(nextDate.getFullYear() + 5)
+    nextDate = addMonthsClamped(nextDate, 60)
   } else if (normalizedFrequency === 'monthly') {
-    nextDate.setMonth(nextDate.getMonth() + 1)
+    nextDate = addMonthsClamped(nextDate, 1)
   } else if (normalizedFrequency === 'quarterly') {
-    nextDate.setMonth(nextDate.getMonth() + 3)
+    nextDate = addMonthsClamped(nextDate, 3)
   } else if (normalizedFrequency === 'six_monthly') {
-    nextDate.setMonth(nextDate.getMonth() + 6)
+    nextDate = addMonthsClamped(nextDate, 6)
   } else if (normalizedFrequency === 'yearly') {
-    nextDate.setFullYear(nextDate.getFullYear() + 1)
+    nextDate = addMonthsClamped(nextDate, 12)
   } else {
     return null
   }
 
-  return nextDate.toISOString().slice(0, 10)
+  return toDateInput(nextDate)
 }
 
 export function getNextCycleFrequency(item) {
@@ -950,7 +977,7 @@ export function createTelLink(contactNumber) {
 }
 
 export function getDateInputValue(date = new Date()) {
-  return date.toISOString().slice(0, 10)
+  return toDateInput(date)
 }
 
 export function getActionPriority(item) {
@@ -1184,12 +1211,18 @@ export function getIncomeItemsForMonth(items, monthKey) {
   return getItemsForMonth(
     items.filter(isIncomeItem),
     monthKey,
-    (item) => item.date,
+    getIncomeEffectiveDate,
   ).sort((a, b) => {
-    const aDate = toDate(a.date)?.getTime() ?? 0
-    const bDate = toDate(b.date)?.getTime() ?? 0
+    const aDate = toDate(getIncomeEffectiveDate(a))?.getTime() ?? 0
+    const bDate = toDate(getIncomeEffectiveDate(b))?.getTime() ?? 0
     return bDate - aDate
   })
+}
+
+function getIncomeEffectiveDate(item) {
+  return item.status === 'received'
+    ? item.receivedDate || item.date
+    : item.date
 }
 
 export function getReceivedIncomeItemsForMonth(items, monthKey) {

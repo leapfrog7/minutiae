@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useDialogFocus } from '../../features/ui/useDialogFocus'
 
 function ConfirmDialog({
   cancelLabel = 'Cancel',
@@ -13,6 +14,7 @@ function ConfirmDialog({
     tone === 'danger'
       ? 'bg-rose-600 text-white'
       : 'bg-teal-700 text-white'
+  const dialogRef = useDialogFocus(onCancel)
 
   useEffect(() => {
     function handleInternalBack(event) {
@@ -31,11 +33,12 @@ function ConfirmDialog({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20 md:max-w-md">
+      <div ref={dialogRef} className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20 md:max-w-md">
         <h2 className="text-base font-bold text-stone-950">{title}</h2>
         <p className="mt-2 text-sm text-stone-600">{message}</p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
+            data-dialog-initial-focus
             type="button"
             onClick={onCancel}
             className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-bold text-stone-800"

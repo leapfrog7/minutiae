@@ -29,6 +29,7 @@ function App() {
 
   useEffect(() => {
     window.history.replaceState({ minutiaePage: 'home' }, '')
+    window.history.pushState({ minutiaePage: 'home', minutiaeGuard: true }, '')
 
     function handlePopState() {
       const backEvent = new CustomEvent('minutiae:back', {
@@ -48,7 +49,10 @@ function App() {
         setPendingAddType('')
         setActivePage('home')
         window.history.replaceState({ minutiaePage: 'home' }, '')
+        return
       }
+
+      window.history.back()
     }
 
     window.addEventListener('popstate', handlePopState)

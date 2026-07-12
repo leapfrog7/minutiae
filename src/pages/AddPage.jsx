@@ -18,12 +18,6 @@ function AddPage({ initialType = '' }) {
   const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    if (initialType) {
-      setSelectedType(initialType)
-    }
-  }, [initialType])
-
-  useEffect(() => {
     function handleInternalBack(event) {
       if (!selectedType) {
         return
@@ -48,11 +42,13 @@ function AddPage({ initialType = '' }) {
         tone: 'success',
       })
       handlePostSaveNextReminder(result.item)
+      return true
     } catch {
       setToast({
         message: 'Save failed. Please try again.',
         tone: 'error',
       })
+      return false
     }
   }
 
@@ -90,6 +86,7 @@ function AddPage({ initialType = '' }) {
 
       {selectedType ? (
         <AddItemForm
+          key={selectedType}
           selectedType={selectedType}
           onBack={() => setSelectedType('')}
           onSave={handleSave}
