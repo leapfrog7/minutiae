@@ -115,6 +115,31 @@ const defaultValuesByType = {
     status: 'received',
     notes: '',
   },
+  investment: {
+    title: '',
+    investmentType: 'SIP / Mutual Fund',
+    amount: '',
+    dueDate: today(),
+    frequency: 'monthly',
+    status: 'unpaid',
+    paymentMode: 'Bank Transfer',
+    autoPay: 'no',
+    institutionName: '',
+    accountOrFolio: '',
+    addToMoney: 'yes',
+    notes: '',
+  },
+  reminder: {
+    title: '',
+    dueDate: '',
+    category: 'Personal',
+    priority: 'normal',
+    status: 'pending',
+    recurring: 'no',
+    frequency: 'one_time',
+    relatedPerson: '',
+    notes: '',
+  },
   document: {
     title: '',
     recordType: 'Receipt',
@@ -151,6 +176,8 @@ const statusOptionsByType = {
   complaint: ['open', 'followed_up', 'resolved', 'closed'],
   expense: ['paid', 'unpaid'],
   income: ['received', 'expected'],
+  investment: ['unpaid', 'paid', 'overdue'],
+  reminder: ['pending', 'completed'],
   document: ['pending', 'completed', 'paid', 'closed'],
 }
 
@@ -160,6 +187,37 @@ const frequencyOptions = [
   { value: 'six_monthly', label: 'Six-monthly' },
   { value: 'yearly', label: 'Yearly' },
   { value: 'one_time', label: 'One-time' },
+]
+const investmentTypeOptions = [
+  'SIP / Mutual Fund',
+  'PPF',
+  'NPS',
+  'Fixed Deposit',
+  'Recurring Deposit',
+  'Stocks',
+  'Bonds',
+  'Gold',
+  'Insurance-linked Investment',
+  'Other',
+]
+const reminderCategories = [
+  'Tax / ITR',
+  'Office / Work',
+  'Leave',
+  'Personal',
+  'Family',
+  'Payment',
+  'Government / Compliance',
+  'School / Children',
+  'Health',
+  'Home',
+  'Follow-up',
+  'Other',
+]
+const reminderFrequencyOptions = [
+  { value: 'one_time', label: 'One-time' },
+  { value: 'weekly', label: 'Weekly' },
+  ...frequencyOptions.filter((option) => option.value !== 'one_time'),
 ]
 const billNextReminderOptions = [
   { value: 'auto', label: 'Auto-create after paid' },
@@ -693,6 +751,115 @@ function AddItemForm({
           </>
         )}
 
+        {selectedType === 'investment' && (
+          <>
+            <FormInfoPanel title="What is an Investment?">
+              Use Investments for SIPs, PPF, NPS, deposits and other money set
+              aside for the future. Marking one invested can also include it in Money.
+            </FormInfoPanel>
+            <Field label="Title" error={showError('title')}>
+              <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="Monthly SIP" />
+            </Field>
+            <Field label="Investment type" error={showError('investmentType')}>
+              <SelectInput value={form.investmentType} onChange={(event) => updateField('investmentType', event.target.value)}>
+                {investmentTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </SelectInput>
+            </Field>
+            <TwoFields>
+              <Field label="Amount" error={showError('amount')}>
+                <TextInput type="number" min="0" inputMode="decimal" value={form.amount} onChange={(event) => updateField('amount', event.target.value)} />
+              </Field>
+              <Field label="Due date" error={showError('dueDate')}>
+                <TextInput type="date" value={form.dueDate} onChange={(event) => updateField('dueDate', event.target.value)} />
+              </Field>
+            </TwoFields>
+            <TwoFields>
+              <Field label="Frequency" error={showError('frequency')}>
+                <SelectInput value={form.frequency} onChange={(event) => updateField('frequency', event.target.value)}>
+                  {frequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </SelectInput>
+              </Field>
+              <Field label="Status" error={showError('status')}>
+                <StatusSelect value={form.status} options={statusOptions} onChange={(value) => updateField('status', value)} />
+              </Field>
+            </TwoFields>
+            <TwoFields>
+              <Field label="Payment">
+                <PaymentSelect value={form.paymentMode} onChange={(value) => updateField('paymentMode', value)} />
+              </Field>
+              <Field label="Auto-pay">
+                <SelectInput value={form.autoPay} onChange={(event) => updateField('autoPay', event.target.value)}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </SelectInput>
+              </Field>
+            </TwoFields>
+            <TwoFields>
+              <Field label="Institution">
+                <TextInput value={form.institutionName} onChange={(event) => updateField('institutionName', event.target.value)} placeholder="Bank, broker or fund house" />
+              </Field>
+              <Field label="Account / folio">
+                <TextInput value={form.accountOrFolio} onChange={(event) => updateField('accountOrFolio', event.target.value)} />
+              </Field>
+            </TwoFields>
+            <AddToMoneyOption
+              duplicateExpense={hasExistingLinkedExpense(initialItem)}
+              itemType="investment"
+              status={form.status}
+              value={form.addToMoney}
+              onChange={(value) => updateField('addToMoney', value)}
+            />
+          </>
+        )}
+
+        {selectedType === 'reminder' && (
+          <>
+            <FormInfoPanel title="What is a Reminder?">
+              Use Reminders for tasks and deadlines such as filing ITR,
+              completing APAR, applying leave or paying someone by a date.
+            </FormInfoPanel>
+            <Field label="What needs to be done?" error={showError('title')}>
+              <TextInput value={form.title} onChange={(event) => updateField('title', event.target.value)} placeholder="File ITR" />
+            </Field>
+            <Field label="Due date" error={showError('dueDate')}>
+              <TextInput type="date" value={form.dueDate} onChange={(event) => updateField('dueDate', event.target.value)} />
+            </Field>
+            <TwoFields>
+              <Field label="Category" error={showError('category')}>
+                <SelectInput value={form.category} onChange={(event) => updateField('category', event.target.value)}>
+                  {reminderCategories.map((option) => <option key={option} value={option}>{option}</option>)}
+                </SelectInput>
+              </Field>
+              <Field label="Priority">
+                <SelectInput value={form.priority} onChange={(event) => updateField('priority', event.target.value)}>
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                </SelectInput>
+              </Field>
+            </TwoFields>
+            <TwoFields>
+              <Field label="Status" error={showError('status')}>
+                <StatusSelect value={form.status} options={statusOptions} onChange={(value) => updateField('status', value)} />
+              </Field>
+              <Field label="Recurring">
+                <SelectInput value={form.recurring} onChange={(event) => updateField('recurring', event.target.value)}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </SelectInput>
+              </Field>
+            </TwoFields>
+            <Field label="Frequency">
+              <SelectInput value={form.frequency} onChange={(event) => updateField('frequency', event.target.value)}>
+                {reminderFrequencyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </SelectInput>
+            </Field>
+            <Field label="Related person">
+              <TextInput value={form.relatedPerson} onChange={(event) => updateField('relatedPerson', event.target.value)} placeholder="Friend, colleague, bank contact..." />
+            </Field>
+          </>
+        )}
+
         {selectedType === 'document' && (
           <>
             <FormGroup title="Record details">
@@ -1202,6 +1369,22 @@ function validateForm(type, form) {
     if (!form.status) errors.status = 'Status is required.'
   }
 
+  if (type === 'investment') {
+    if (!form.title.trim()) errors.title = 'Title is required.'
+    if (!form.investmentType) errors.investmentType = 'Investment type is required.'
+    positiveAmount('amount')
+    if (!form.dueDate) errors.dueDate = 'Due date is required.'
+    if (!form.frequency) errors.frequency = 'Frequency is required.'
+    if (!form.status) errors.status = 'Status is required.'
+  }
+
+  if (type === 'reminder') {
+    if (!form.title.trim()) errors.title = 'Title is required.'
+    if (!form.dueDate) errors.dueDate = 'Due date is required.'
+    if (!form.category) errors.category = 'Category is required.'
+    if (!form.status) errors.status = 'Status is required.'
+  }
+
   if (type === 'document') {
     if (!form.title.trim()) errors.title = 'Title is required.'
     if (
@@ -1224,7 +1407,7 @@ function validateForm(type, form) {
 function getSaveOptions(type, form) {
   return {
     recordExpense:
-      ((['bill', 'vendor', 'subscription', 'insurance'].includes(type) &&
+      ((['bill', 'vendor', 'subscription', 'insurance', 'investment'].includes(type) &&
         form.status === 'paid') ||
         (type === 'document' &&
           ['paid', 'completed'].includes(form.status) &&
@@ -1327,6 +1510,28 @@ function buildLifeItem(type, form) {
       ...form,
       type,
       amount: toNumber(form.amount),
+      recurring: form.recurring === 'yes',
+    }
+  }
+
+  if (type === 'investment') {
+    const itemForm = { ...form }
+    delete itemForm.addToMoney
+
+    return {
+      ...itemForm,
+      type,
+      amount: toNumber(form.amount),
+      category: form.investmentType,
+      autoPay: form.autoPay === 'yes',
+    }
+  }
+
+  if (type === 'reminder') {
+    return {
+      ...form,
+      type,
+      amount: 0,
       recurring: form.recurring === 'yes',
     }
   }
@@ -1445,6 +1650,28 @@ function getInitialForm(type, initialItem) {
       ...baseForm,
       recurring: initialItem.recurring ? 'yes' : 'no',
       frequency: normalizeOption(initialItem.frequency, 'monthly'),
+    }
+  }
+
+  if (type === 'investment') {
+    const duplicateExpense = hasExistingLinkedExpense(initialItem)
+
+    return {
+      ...baseForm,
+      investmentType: initialItem.investmentType || initialItem.category || 'SIP / Mutual Fund',
+      frequency: normalizeOption(initialItem.frequency, 'monthly'),
+      autoPay: initialItem.autoPay ? 'yes' : 'no',
+      addToMoney:
+        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
+    }
+  }
+
+  if (type === 'reminder') {
+    return {
+      ...baseForm,
+      recurring: initialItem.recurring ? 'yes' : 'no',
+      frequency: normalizeOption(initialItem.frequency, 'one_time'),
+      priority: normalizeOption(initialItem.priority, 'normal'),
     }
   }
 

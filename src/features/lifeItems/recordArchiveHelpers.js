@@ -53,6 +53,8 @@ export function getRecordDate(item) {
     expense: ['date', 'paidDate', 'createdAt'],
     income: ['date', 'createdAt'],
     insurance: ['paidDate', 'dueDate', 'createdAt'],
+    investment: ['paidDate', 'dueDate', 'createdAt'],
+    reminder: ['completedAt', 'dueDate', 'createdAt'],
     subscription: ['paidDate', 'renewalDate', 'dueDate', 'createdAt'],
     vendor: ['paidDate', 'paymentDate', 'dueDate', 'createdAt'],
   }

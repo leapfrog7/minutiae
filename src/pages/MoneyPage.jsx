@@ -33,6 +33,7 @@ const obligationGroups = [
   ["bill", "Bills"],
   ["vendor", "Vendors"],
   ["insurance", "Insurance"],
+  ["investment", "Investments"],
 ];
 
 function MoneyPage({ onNavigate }) {

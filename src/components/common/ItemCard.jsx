@@ -97,6 +97,14 @@ function getSubtitle(item, dateLabel) {
     return `${item.category || 'Income'} - ${dateLabel}`
   }
 
+  if (item.type === 'investment') {
+    return `${item.investmentType || 'Investment'} - ${dateLabel}`
+  }
+
+  if (item.type === 'reminder') {
+    return `${item.category || 'Reminder'} - ${dateLabel}`
+  }
+
   if (item.type === 'document') {
     return `${item.recordType || item.documentType || 'Record'} - ${dateLabel}`
   }
@@ -119,6 +127,15 @@ function getDetail(item) {
         item.attachmentNote ||
         ''
       )
+    }
+
+    if (item.type === 'investment') {
+      return item.institutionName || item.accountOrFolio || item.investmentType || ''
+    }
+
+    if (item.type === 'reminder') {
+      const priority = `${item.priority || 'normal'} priority`
+      return item.relatedPerson ? `${priority} - ${item.relatedPerson}` : priority
     }
 
     return ''

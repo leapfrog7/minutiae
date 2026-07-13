@@ -4,7 +4,9 @@ export const itemTypeEmojis = {
   document: '\u{1F9F0}',
   expense: '\u{1F4B8}',
   income: '\u{1F4B0}',
+  investment: '\u{1F4C8}',
   insurance: '\u{1F6E1}\uFE0F',
+  reminder: '\u23F0',
   subscription: '\u{1F501}',
   vendor: '\u{1F464}',
 }
@@ -43,10 +45,22 @@ export const itemTypes = [
     description: 'Salary or other money received',
   },
   {
+    id: 'investment',
+    label: 'Investment',
+    emoji: itemTypeEmojis.investment,
+    description: 'SIP, PPF, NPS, fixed deposits and other money set aside for the future',
+  },
+  {
     id: 'insurance',
     label: 'Insurance',
     emoji: itemTypeEmojis.insurance,
     description: 'Premium due or paid',
+  },
+  {
+    id: 'reminder',
+    label: 'Reminder',
+    emoji: itemTypeEmojis.reminder,
+    description: 'Tasks, deadlines, filings, follow-ups or personal commitments',
   },
   {
     id: 'complaint',

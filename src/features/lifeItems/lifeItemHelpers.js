@@ -8,7 +8,14 @@ const inactiveStatuses = new Set([
   'resolved',
   'closed',
 ])
-const expenseSourceTypes = new Set(['bill', 'subscription', 'vendor', 'insurance', 'document'])
+const expenseSourceTypes = new Set([
+  'bill',
+  'subscription',
+  'vendor',
+  'insurance',
+  'investment',
+  'document',
+])
 
 const toDate = (value) => {
   if (!value) {
@@ -213,6 +220,8 @@ export function getLifeItemStats(items) {
       expense: 0,
       insurance: 0,
       income: 0,
+      investment: 0,
+      reminder: 0,
       lastUpdated: '',
       lastUpdatedTime: 0,
       subscription: 0,
@@ -226,6 +235,10 @@ export function getLifeItemStats(items) {
 }
 
 export function getRelevantDate(item) {
+  if (item.type === 'reminder') {
+    return item.dueDate
+  }
+
   if (item.type === 'subscription') {
     return item.renewalDate || item.dueDate || item.date
   }
@@ -291,6 +304,10 @@ export function getRelevantDateLabel(item) {
 }
 
 export function getQuickStatusAction(item) {
+  if (item.type === 'reminder' && item.status === 'pending') {
+    return { label: 'Mark Completed', status: 'completed' }
+  }
+
   if (item.type === 'income' && item.status === 'expected') {
     return { label: 'Mark Received', status: 'received' }
   }
@@ -301,6 +318,10 @@ export function getQuickStatusAction(item) {
 
   if (item.type === 'bill' && ['unpaid', 'overdue'].includes(item.status)) {
     return { label: 'Mark Paid', status: 'paid' }
+  }
+
+  if (item.type === 'investment' && ['unpaid', 'overdue'].includes(item.status)) {
+    return { label: 'Mark Invested', status: 'paid' }
   }
 
   if (
@@ -360,6 +381,7 @@ export function getExpenseCategoryForSourceItem(item) {
     bill: item.category || 'Bills',
     document: getDocumentExpenseCategory(item),
     insurance: 'Insurance',
+    investment: 'Investment',
     subscription: 'Subscription',
     vendor: item.serviceType || 'Local Vendors',
   }
@@ -421,6 +443,8 @@ export function createExpenseFromSourceItem(sourceItem, dateOverride) {
     recurring:
       sourceItem.type === 'document'
         ? false
+        : sourceItem.type === 'investment'
+          ? normalizeCycleValue(sourceItem.frequency) !== 'one_time'
         : sourceItem.type === 'vendor'
         ? ['monthly', 'weekly'].includes(sourceItem.paymentFrequency)
         : sourceItem.type !== 'bill',
@@ -480,7 +504,11 @@ export function getNextCycleDate(dateString, frequency) {
 }
 
 export function getNextCycleFrequency(item) {
-  if (item.type === 'bill' || item.type === 'insurance') {
+  if (item.type === 'reminder') {
+    return item.recurring ? normalizeCycleValue(item.frequency) : ''
+  }
+
+  if (['bill', 'insurance', 'investment'].includes(item.type)) {
     return normalizeCycleValue(item.frequency)
   }
 
@@ -501,7 +529,11 @@ export function getNextCycleFrequency(item) {
 }
 
 export function getNextCycleBaseDate(item) {
-  if (item.type === 'bill' || item.type === 'insurance') {
+  if (item.type === 'reminder') {
+    return item.dueDate || item.completedAt || getDateInputValue()
+  }
+
+  if (['bill', 'insurance', 'investment'].includes(item.type)) {
     return item.dueDate || item.paidDate || getDateInputValue()
   }
 
@@ -522,7 +554,7 @@ export function getNextCycleBaseDate(item) {
 }
 
 export function canCreateNextCycleReminder(item) {
-  if (!['bill', 'vendor', 'subscription', 'insurance', 'document'].includes(item?.type)) {
+  if (!['bill', 'vendor', 'subscription', 'insurance', 'investment', 'reminder', 'document'].includes(item?.type)) {
     return false
   }
 
@@ -561,6 +593,7 @@ export function buildNextCycleItemDraft(item) {
     linkedItemId: undefined,
     linkedItemType: undefined,
     paidDate: '',
+    completedAt: '',
     updatedAt: undefined,
   }
 
@@ -610,6 +643,24 @@ export function buildNextCycleItemDraft(item) {
     }
   }
 
+  if (item.type === 'investment') {
+    return {
+      ...common,
+      dueDate: nextDate,
+      notes: baseNotes,
+      status: 'unpaid',
+    }
+  }
+
+  if (item.type === 'reminder') {
+    return {
+      ...common,
+      dueDate: nextDate,
+      notes: item.notes || '',
+      status: 'pending',
+    }
+  }
+
   if (item.type === 'document') {
     const reminder = getDocumentNextCycleReminder(item)
     const nextDocumentDates = {
@@ -656,6 +707,8 @@ export function getNextCyclePromptMessage(item) {
     bill: `Create the next ${item.category || item.title || 'bill'} reminder?`,
     document: 'Create the next service reminder?',
     insurance: 'Create the next premium reminder?',
+    investment: 'Create next investment reminder?',
+    reminder: 'Create next reminder?',
     subscription: 'Create the next renewal reminder?',
     vendor: `Create the next ${item.vendorName || item.title || 'vendor'} payment reminder?`,
   }
@@ -664,7 +717,7 @@ export function getNextCyclePromptMessage(item) {
 }
 
 export function canSnoozeItem(item) {
-  return ['bill', 'vendor', 'subscription', 'insurance', 'complaint', 'document'].includes(
+  return ['bill', 'vendor', 'subscription', 'insurance', 'investment', 'complaint', 'document'].includes(
     item?.type,
   )
 }
@@ -676,7 +729,7 @@ export function getSnoozeUpdates(item, days) {
 
   const nextDate = toDateInput(addDays(startOfToday(), days))
 
-  if (item.type === 'bill' || item.type === 'insurance') {
+  if (['bill', 'insurance', 'investment'].includes(item.type)) {
     return { dueDate: nextDate }
   }
 
@@ -772,7 +825,7 @@ function normalizeCycleValue(value) {
 
 function getSimilarityIdentity(item) {
   if (
-    (['bill', 'subscription', 'expense', 'income'].includes(item.type) && !item.title) ||
+    (['bill', 'subscription', 'expense', 'income', 'investment', 'reminder'].includes(item.type) && !item.title) ||
     (item.type === 'vendor' && !item.vendorName && !item.title) ||
     (item.type === 'insurance' && !item.policyNumber && !item.title) ||
     (item.type === 'document' && !item.referenceNumber && !item.relatedTo && !item.title) ||
@@ -788,6 +841,8 @@ function getSimilarityIdentity(item) {
     expense: [item.title, item.category],
     income: [item.title, item.sourceName || item.category],
     insurance: [item.policyNumber || item.title, item.insurerName],
+    investment: [item.title, item.investmentType],
+    reminder: [item.title, item.category, item.relatedPerson],
     subscription: [item.title, item.category],
     vendor: [item.vendorName || item.title, item.serviceType],
   }
@@ -800,7 +855,7 @@ function getSimilarityIdentity(item) {
 }
 
 function getSimilarityDate(item) {
-  if (item.type === 'bill' || item.type === 'insurance') {
+  if (['bill', 'insurance', 'investment', 'reminder'].includes(item.type)) {
     return item.dueDate || item.paidDate || item.createdAt || ''
   }
 
@@ -1021,6 +1076,8 @@ export function getCalendarItems(items) {
     'bill',
     'vendor',
     'insurance',
+    'investment',
+    'reminder',
     'complaint',
     'document',
   ])
@@ -1039,9 +1096,7 @@ export function getPriorityItems(items, limit = 5) {
         return a.priority - b.priority
       }
 
-      const aDate = toDate(getRelevantDate(a.item))?.getTime() ?? 0
-      const bDate = toDate(getRelevantDate(b.item))?.getTime() ?? 0
-      return aDate - bDate
+      return compareItemsByRelevantDateAndPriority(a.item, b.item)
     })
     .slice(0, limit)
     .map(({ item }) => item)
@@ -1084,11 +1139,30 @@ export function getItemsForMonth(items, monthKey, dateResolver = getRelevantDate
 }
 
 export function sortItemsByRelevantDate(items) {
-  return [...items].sort((a, b) => {
-    const aDate = toDate(getRelevantDate(a))?.getTime() ?? Number.MAX_SAFE_INTEGER
-    const bDate = toDate(getRelevantDate(b))?.getTime() ?? Number.MAX_SAFE_INTEGER
+  return [...items].sort(compareItemsByRelevantDateAndPriority)
+}
+
+function compareItemsByRelevantDateAndPriority(a, b) {
+  const aDate = toDate(getRelevantDate(a))?.getTime() ?? Number.MAX_SAFE_INTEGER
+  const bDate = toDate(getRelevantDate(b))?.getTime() ?? Number.MAX_SAFE_INTEGER
+
+  if (aDate !== bDate) {
     return aDate - bDate
-  })
+  }
+
+  return getReminderPriorityRank(a) - getReminderPriorityRank(b)
+}
+
+function getReminderPriorityRank(item) {
+  if (item.type !== 'reminder') {
+    return 1
+  }
+
+  return {
+    high: 0,
+    low: 2,
+    normal: 1,
+  }[item.priority] ?? 1
 }
 
 export function getItemsDueSoon(items, days = 7) {
@@ -1361,7 +1435,7 @@ export function getExpenseStatsForMonth(items, monthKey) {
 }
 
 export function getRecurringObligationsForMonth(items, monthKey) {
-  const obligationTypes = new Set(['subscription', 'bill', 'vendor', 'insurance'])
+  const obligationTypes = new Set(['subscription', 'bill', 'vendor', 'insurance', 'investment'])
   const itemsForMonth = sortItemsByRelevantDate(
     getItemsForMonth(
       items.filter(
@@ -1376,6 +1450,7 @@ export function getRecurringObligationsForMonth(items, monthKey) {
     bill: itemsForMonth.filter((item) => item.type === 'bill'),
     vendor: itemsForMonth.filter((item) => item.type === 'vendor'),
     insurance: itemsForMonth.filter((item) => item.type === 'insurance'),
+    investment: itemsForMonth.filter((item) => item.type === 'investment'),
   }
 
   return {

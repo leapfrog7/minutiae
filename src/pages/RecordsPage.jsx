@@ -30,6 +30,11 @@ const searchableFields = [
   "policyNumber",
   "insurerName",
   "sourceName",
+  "investmentType",
+  "institutionName",
+  "accountOrFolio",
+  "relatedPerson",
+  "priority",
   "billingCycle",
   "autoRenewal",
   "premiumAmount",
@@ -61,6 +66,8 @@ const filterOptions = [
   { id: "vendor", label: "Vendors" },
   { id: "subscription", label: "Subscriptions" },
   { id: "income", label: "Income" },
+  { id: "investment", label: "Investments" },
+  { id: "reminder", label: "Reminders" },
   { id: "insurance", label: "Insurance" },
   { id: "complaint", label: "Complaints" },
   { id: "document", label: "Records / Maintenance" },
@@ -205,7 +212,7 @@ function RecordsPage({ onNavigate }) {
       {!hasItems ? (
         <EmptyState
           title="No records yet"
-          description="Your bills, expenses, vendors, complaints, income and maintenance records will appear here once added."
+          description="Your bills, expenses, income, investments, reminders, vendors, complaints and maintenance records will appear here once added."
           cta={
             <button
               type="button"

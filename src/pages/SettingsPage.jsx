@@ -27,6 +27,8 @@ const statLabels = [
   ['complaint', 'Complaints'],
   ['expense', 'Expenses'],
   ['income', 'Income'],
+  ['investment', 'Investments'],
+  ['reminder', 'Reminders'],
   ['document', 'Documents'],
   ['actionable', 'Open/actionable'],
 ]

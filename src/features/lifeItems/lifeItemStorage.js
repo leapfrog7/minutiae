@@ -41,10 +41,29 @@ const withTimestamps = (item, timestamp) => ({
   paymentMode: '',
   notes: '',
   ...item,
+  ...(item.type === 'reminder' && item.status === 'completed'
+    ? { completedAt: item.completedAt || timestamp }
+    : {}),
   id: item.id ?? createId(),
   createdAt: item.createdAt ?? timestamp,
   updatedAt: item.updatedAt ?? timestamp,
 })
+
+const getReminderCompletionUpdates = (item, updates, timestamp) => {
+  if (item?.type !== 'reminder' || !Object.hasOwn(updates, 'status')) {
+    return {}
+  }
+
+  if (updates.status === 'completed') {
+    return { completedAt: updates.completedAt || item.completedAt || timestamp }
+  }
+
+  if (updates.status === 'pending') {
+    return { completedAt: '' }
+  }
+
+  return {}
+}
 
 const createSampleLifeItems = () => {
   const now = new Date().toISOString()
@@ -310,6 +329,41 @@ const createSampleLifeItems = () => {
     ),
     withTimestamps(
       {
+        id: 'sample-monthly-sip',
+        type: 'investment',
+        title: 'Monthly SIP',
+        investmentType: 'SIP / Mutual Fund',
+        amount: 5000,
+        dueDate: addDays(6),
+        status: 'unpaid',
+        paymentMode: 'Auto Debit',
+        category: 'SIP / Mutual Fund',
+        frequency: 'monthly',
+        autoPay: true,
+        institutionName: 'Mutual fund account',
+        accountOrFolio: '',
+        notes: 'Monthly long-term investment reminder.',
+      },
+      now,
+    ),
+    withTimestamps(
+      {
+        id: 'sample-itr-reminder',
+        type: 'reminder',
+        title: 'File ITR',
+        dueDate: addDays(7),
+        category: 'Tax / ITR',
+        priority: 'high',
+        status: 'pending',
+        recurring: true,
+        frequency: 'yearly',
+        relatedPerson: '',
+        notes: 'Collect Form 16 and investment proofs before filing.',
+      },
+      now,
+    ),
+    withTimestamps(
+      {
         id: 'sample-fuel',
         type: 'expense',
         title: 'Fuel expense',
@@ -484,9 +538,15 @@ export function addLifeItemWithLinkedExpense(item, { recordExpense = false } = {
 }
 
 export function updateLifeItem(id, updates) {
+  const timestamp = new Date().toISOString()
   const nextItems = getLifeItems().map((item) =>
     item.id === id
-      ? { ...item, ...updates, updatedAt: new Date().toISOString() }
+      ? {
+          ...item,
+          ...updates,
+          ...getReminderCompletionUpdates(item, updates, timestamp),
+          updatedAt: timestamp,
+        }
       : item,
   )
 
@@ -512,6 +572,7 @@ export function updateLifeItemWithLinkedExpense(
     updatedItem = {
       ...item,
       ...updates,
+      ...getReminderCompletionUpdates(item, updates, timestamp),
       ...(paidDate ? { paidDate } : {}),
       updatedAt: timestamp,
     }

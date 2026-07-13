@@ -310,7 +310,9 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
             <div className="mt-4 grid gap-2 md:grid-cols-2">
               {expenseRecorded && canRecordPaymentAsExpense(item) && (
                 <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-                  Expense recorded in Money.
+                  {item.type === 'investment'
+                    ? 'Included in Money.'
+                    : 'Expense recorded in Money.'}
                 </p>
               )}
               {quickAction && (
@@ -328,7 +330,9 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
                   onClick={handleRecordExpense}
                   className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white md:col-span-2"
                 >
-                  {item.type === 'document' ? 'Add to Money' : 'Record expense'}
+                  {['document', 'investment'].includes(item.type)
+                    ? 'Add to Money'
+                    : 'Record expense'}
                 </button>
               )}
               <div className="grid grid-cols-2 gap-2 md:col-span-2">
@@ -631,6 +635,23 @@ function getSpecificRows(item) {
       ['Recurring', item.recurring],
       ['Frequency', formatCycleLabel(item.frequency)],
     ],
+    investment: [
+      ['Investment type', item.investmentType],
+      ['Institution', item.institutionName],
+      ['Account / folio', item.accountOrFolio],
+      ['Due date', formatOptionalDate(item.dueDate)],
+      ['Paid date', formatOptionalDate(item.paidDate)],
+      ['Frequency', formatCycleLabel(item.frequency)],
+      ['Auto-pay', item.autoPay],
+    ],
+    reminder: [
+      ['Due date', formatOptionalDate(item.dueDate)],
+      ['Priority', item.priority],
+      ['Recurring', item.recurring],
+      ['Frequency', formatCycleLabel(item.frequency)],
+      ['Related person', item.relatedPerson],
+      ['Completed', formatOptionalDate(item.completedAt)],
+    ],
     document: [
       ['Record type', item.recordType || item.documentType || 'Receipt'],
       ['Related to', item.relatedTo],
@@ -660,7 +681,7 @@ function getSpecificRows(item) {
 }
 
 function formatOptionalDate(value) {
-  return value ? formatDisplayDate(value) : ''
+  return value ? formatDisplayDate(String(value).slice(0, 10)) : ''
 }
 
 function formatDateWithInterval(dateValue, interval) {

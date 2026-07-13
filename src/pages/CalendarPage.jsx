@@ -30,8 +30,10 @@ const filterOptions = [
   { id: "subscription", label: "Subscriptions" },
   { id: "vendor", label: "Vendors" },
   { id: "insurance", label: "Insurance" },
+  { id: "investment", label: "Investments" },
+  { id: "reminder", label: "Reminders" },
   { id: "complaint", label: "Complaints" },
-  { id: "document", label: "Documents" },
+  { id: "document", label: "Records / Maintenance" },
 ];
 
 function CalendarPage({ onNavigate }) {
@@ -171,7 +173,7 @@ function CalendarPage({ onNavigate }) {
         ) : !hasItems ? (
           <EmptyState
             title="Nothing scheduled yet"
-            description="Add a bill, subscription, vendor payment, complaint follow-up, insurance due date or document expiry to see your household timeline here."
+            description="Add a bill, investment, reminder, subscription, vendor payment, complaint follow-up, insurance due date or document expiry to see your household timeline here."
             cta={
               <button
                 type="button"

@@ -260,7 +260,7 @@ function HomePage({ onNavigate }) {
         !shouldShowOnboarding && (
           <EmptyState
             title="No items yet"
-            description="Add a bill, income, vendor payment, subscription, complaint or maintenance reminder to begin."
+            description="Add a bill, income, investment, reminder, vendor payment, subscription, complaint or maintenance record to begin."
             cta={
               <button
                 type="button"

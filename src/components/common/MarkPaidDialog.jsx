@@ -6,6 +6,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
   const dialogRef = useDialogFocus(onCancel)
   const [recordExpense, setRecordExpense] = useState(!duplicateExpense)
   const isVendor = item?.type === 'vendor'
+  const isInvestment = item?.type === 'investment'
   const [vendorUpdates, setVendorUpdates] = useState(() => ({
     adjustmentAmount: item?.adjustmentAmount || '',
     advanceAdjusted: item?.advanceAdjusted || '',
@@ -36,12 +37,16 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
       className="fixed inset-0 z-30 flex items-center justify-center bg-stone-950/40 px-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Mark as paid"
+      aria-label={isInvestment ? 'Mark as invested' : 'Mark as paid'}
     >
       <div ref={dialogRef} className="max-h-[86vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl shadow-stone-950/20 md:max-w-xl">
-        <h2 className="text-base font-bold text-stone-950">Mark as paid?</h2>
+        <h2 className="text-base font-bold text-stone-950">
+          {isInvestment ? 'Mark as invested?' : 'Mark as paid?'}
+        </h2>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Add this payment to Money as an expense too?
+          {isInvestment
+            ? 'Include this investment in Money as an expense too?'
+            : 'Add this payment to Money as an expense too?'}
         </p>
 
         {isVendor && (
@@ -104,7 +109,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
           />
           <span>
             <span className="block text-sm font-bold text-stone-900">
-              Add this payment to Money
+              {isInvestment ? 'Include this investment in Money' : 'Add this payment to Money'}
             </span>
             <span className="mt-1 block text-xs leading-5 text-stone-500">
               {duplicateExpense
@@ -143,7 +148,7 @@ function MarkPaidDialog({ duplicateExpense = false, item, onCancel, onConfirm })
             disabled={isVendor && Number(vendorUpdates.amountPaid || 0) <= 0}
             className="rounded-2xl bg-teal-700 px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-stone-300"
           >
-            Mark Paid
+            {isInvestment ? 'Mark Invested' : 'Mark Paid'}
           </button>
         </div>
       </div>

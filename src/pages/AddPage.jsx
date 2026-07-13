@@ -80,7 +80,7 @@ function AddPage({ initialType = '' }) {
         description={
           selectedType
             ? 'Add just enough detail to make this easy to find and follow up.'
-            : 'Add expenses, bills, vendor payments, income, renewals or records.'
+            : 'Add expenses, bills, income, investments, reminders, vendor payments, renewals or records.'
         }
       />
 
