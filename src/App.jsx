@@ -19,6 +19,7 @@ const pages = {
 function App() {
   const [activePage, setActivePage] = useState('home')
   const [pendingAddType, setPendingAddType] = useState('')
+  const [pendingAddItem, setPendingAddItem] = useState(null)
   const activePageRef = useRef(activePage)
 
   const CurrentPage = pages[activePage]
@@ -47,6 +48,7 @@ function App() {
 
       if (activePageRef.current !== 'home') {
         setPendingAddType('')
+        setPendingAddItem(null)
         setActivePage('home')
         window.history.replaceState({ minutiaePage: 'home' }, '')
         return
@@ -72,19 +74,25 @@ function App() {
   function handleNavigate(nextPage) {
     if (typeof nextPage === 'object') {
       setPendingAddType(nextPage.type || '')
+      setPendingAddItem(nextPage.initialItem || null)
       setActivePage(nextPage.page)
       syncHistory(nextPage.page)
       return
     }
 
     setPendingAddType('')
+    setPendingAddItem(null)
     setActivePage(nextPage)
     syncHistory(nextPage)
   }
 
   return (
     <AppShell activePage={activePage} onNavigate={handleNavigate}>
-      <CurrentPage initialType={pendingAddType} onNavigate={handleNavigate} />
+      <CurrentPage
+        initialItem={pendingAddItem}
+        initialType={pendingAddType}
+        onNavigate={handleNavigate}
+      />
     </AppShell>
   )
 }

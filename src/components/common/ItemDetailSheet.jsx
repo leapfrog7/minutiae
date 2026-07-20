@@ -30,6 +30,11 @@ import {
   updateLifeItem,
   updateLifeItemWithLinkedExpense,
 } from '../../features/lifeItems/lifeItemStorage'
+import { createSimilarItemDraft } from '../../features/lifeItems/lifeItemDrafts'
+import {
+  getLifeItemShareSummary,
+  getLifeItemShareTitle,
+} from '../../features/lifeItems/lifeItemSharing'
 import ConfirmDialog from './ConfirmDialog'
 import MarkPaidDialog from './MarkPaidDialog'
 import NextReminderPrompt from './NextReminderPrompt'
@@ -37,7 +42,13 @@ import StatusBadge from './StatusBadge'
 import Toast from './Toast'
 import { useDialogFocus } from '../../features/ui/useDialogFocus'
 
-function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
+function ItemDetailSheet({
+  item,
+  onClose,
+  onItemDeleted,
+  onItemUpdated,
+  onNavigate,
+}) {
   const dialogRef = useDialogFocus(onClose, Boolean(item))
   const [isEditing, setIsEditing] = useState(false)
   const [showPaidConfirm, setShowPaidConfirm] = useState(false)
@@ -202,15 +213,65 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
     }
   }
 
-  function handleCopy(value, label) {
-    if (!navigator.clipboard || !value) {
+  async function handleCopy(value, label) {
+    if (!value) {
       return
     }
 
-    navigator.clipboard.writeText(value).then(() => {
+    try {
+      await copyText(value)
       setCopiedValue(label)
       window.setTimeout(() => setCopiedValue(''), 1600)
+    } catch {
+      setToast({ message: 'Could not copy this value.', tone: 'error' })
+    }
+  }
+
+  function handleCreateSimilar() {
+    const initialItem = createSimilarItemDraft(item)
+
+    if (!initialItem || !onNavigate) {
+      setToast({ message: 'Could not prepare a similar item.', tone: 'error' })
+      return
+    }
+
+    onClose()
+    onNavigate({
+      initialItem,
+      page: 'add',
+      type: initialItem.type,
     })
+  }
+
+  async function handleShareSummary() {
+    const text = getLifeItemShareSummary(item)
+
+    if (!text) {
+      setToast({ message: 'Could not prepare this summary.', tone: 'error' })
+      return
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          text,
+          title: getLifeItemShareTitle(item),
+        })
+        setToast({ message: 'Summary shared.', tone: 'success' })
+        return
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return
+        }
+      }
+    }
+
+    try {
+      await copyText(text)
+      setToast({ message: 'Summary copied. You can paste it anywhere.', tone: 'success' })
+    } catch {
+      setToast({ message: 'Could not share or copy this summary.', tone: 'error' })
+    }
   }
 
   function handleSnooze(days) {
@@ -338,6 +399,22 @@ function ItemDetailSheet({ item, onClose, onItemDeleted, onItemUpdated }) {
               <div className="grid grid-cols-2 gap-2 md:col-span-2">
                 <button
                   type="button"
+                  onClick={handleCreateSimilar}
+                  className="rounded-2xl bg-teal-50 px-3 py-3 text-sm font-bold text-teal-800 ring-1 ring-teal-200"
+                >
+                  Create similar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShareSummary}
+                  className="rounded-2xl bg-sky-50 px-3 py-3 text-sm font-bold text-sky-800 ring-1 ring-sky-200"
+                >
+                  Share summary
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:col-span-2">
+                <button
+                  type="button"
                   onClick={() => setIsEditing(true)}
                   className="rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-white"
                 >
@@ -395,6 +472,32 @@ function movedToRecurringDoneStatus(previousItem, updatedItem) {
   }
 
   return ['paid', 'completed', 'closed'].includes(updatedItem.status)
+}
+
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value)
+      return
+    } catch {
+      // Fall through to the legacy copy path when clipboard permission is denied.
+    }
+  }
+
+  const textArea = document.createElement('textarea')
+  textArea.value = value
+  textArea.setAttribute('readonly', '')
+  textArea.style.position = 'fixed'
+  textArea.style.opacity = '0'
+  document.body.appendChild(textArea)
+  textArea.select()
+
+  const copied = document.execCommand('copy')
+  textArea.remove()
+
+  if (!copied) {
+    throw new Error('Copy failed')
+  }
 }
 
 function isFinishedForSnooze(item) {

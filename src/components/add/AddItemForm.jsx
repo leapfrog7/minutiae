@@ -327,8 +327,8 @@ function AddItemForm({
 }) {
   const typeMeta = getItemTypeMeta(selectedType)
   const initialForm = useMemo(
-    () => getInitialForm(selectedType, initialItem),
-    [initialItem, selectedType],
+    () => getInitialForm(selectedType, initialItem, mode),
+    [initialItem, mode, selectedType],
   )
   const [form, setForm] = useState(initialForm)
   const [submitted, setSubmitted] = useState(false)
@@ -1563,7 +1563,7 @@ function buildLifeItem(type, form) {
   }
 }
 
-function getInitialForm(type, initialItem) {
+function getInitialForm(type, initialItem, mode = 'add') {
   if (!initialItem) {
     return getDefaultForm(type)
   }
@@ -1579,8 +1579,12 @@ function getInitialForm(type, initialItem) {
 
     return {
       ...baseForm,
-      addToMoney:
-        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
+      addToMoney: getInitialAddToMoneyValue(
+        baseForm,
+        mode,
+        initialItem.status === 'paid',
+        duplicateExpense,
+      ),
       autoRenewal: initialItem.autoRenewal ? 'yes' : 'no',
       billingCycle: normalizeOption(initialItem.billingCycle, 'monthly'),
     }
@@ -1591,8 +1595,12 @@ function getInitialForm(type, initialItem) {
 
     return {
       ...baseForm,
-      addToMoney:
-        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
+      addToMoney: getInitialAddToMoneyValue(
+        baseForm,
+        mode,
+        initialItem.status === 'paid',
+        duplicateExpense,
+      ),
       frequency: normalizeOption(initialItem.frequency, 'monthly'),
       nextReminderMode: normalizeOption(initialItem.nextReminderMode, 'auto'),
     }
@@ -1603,8 +1611,12 @@ function getInitialForm(type, initialItem) {
 
     return {
       ...baseForm,
-      addToMoney:
-        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
+      addToMoney: getInitialAddToMoneyValue(
+        baseForm,
+        mode,
+        initialItem.status === 'paid',
+        duplicateExpense,
+      ),
       premiumAmount: initialItem.premiumAmount || initialItem.amount || '',
       frequency: normalizeOption(initialItem.frequency, 'yearly'),
     }
@@ -1633,8 +1645,12 @@ function getInitialForm(type, initialItem) {
       amountPaid,
       balancePayable: initialItem.balancePayable || '',
       autoPay: initialItem.autoPay ? 'yes' : 'no',
-      addToMoney:
-        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
+      addToMoney: getInitialAddToMoneyValue(
+        baseForm,
+        mode,
+        initialItem.status === 'paid',
+        duplicateExpense,
+      ),
     }
   }
 
@@ -1661,8 +1677,12 @@ function getInitialForm(type, initialItem) {
       investmentType: initialItem.investmentType || initialItem.category || 'SIP / Mutual Fund',
       frequency: normalizeOption(initialItem.frequency, 'monthly'),
       autoPay: initialItem.autoPay ? 'yes' : 'no',
-      addToMoney:
-        initialItem.status === 'paid' && !duplicateExpense ? 'yes' : 'no',
+      addToMoney: getInitialAddToMoneyValue(
+        baseForm,
+        mode,
+        initialItem.status === 'paid',
+        duplicateExpense,
+      ),
     }
   }
 
@@ -1693,14 +1713,29 @@ function getInitialForm(type, initialItem) {
       warrantyInterval: initialItem.warrantyInterval || 'none',
       warrantyTill: initialItem.warrantyTill || '',
       serviceInterval: normalizeOption(initialItem.serviceInterval, 'one_time'),
-      addToMoney:
-        ['paid', 'completed'].includes(initialItem.status) && !duplicateExpense
-          ? 'yes'
-          : 'no',
+      addToMoney: getInitialAddToMoneyValue(
+        baseForm,
+        mode,
+        ['paid', 'completed'].includes(initialItem.status),
+        duplicateExpense,
+      ),
     }
   }
 
   return baseForm
+}
+
+function getInitialAddToMoneyValue(
+  baseForm,
+  mode,
+  statusAllowsExpense,
+  duplicateExpense,
+) {
+  if (mode !== 'edit') {
+    return baseForm.addToMoney || 'yes'
+  }
+
+  return statusAllowsExpense && !duplicateExpense ? 'yes' : 'no'
 }
 
 function getDefaultForm(type) {

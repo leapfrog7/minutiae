@@ -70,6 +70,10 @@ export function getRecordMonthKey(item) {
   return getRecordDate(item).slice(0, 7)
 }
 
+export function getRecordYearKey(item) {
+  return getRecordMonthKey(item).slice(0, 4)
+}
+
 export function getRecordDateKey(item) {
   return getRecordDate(item)
 }
@@ -136,6 +140,29 @@ export function groupRecordsByMonthAndDate(items) {
       label: getMonthLabel(month.monthKey),
       summary: getMonthSummaryText(month),
     })),
+  )
+}
+
+export function groupRecordsByYearMonthAndDate(items) {
+  const yearMap = groupRecordsByMonthAndDate(items).reduce((years, month) => {
+    const yearKey = month.monthKey.slice(0, 4)
+
+    if (!years.has(yearKey)) {
+      years.set(yearKey, {
+        months: [],
+        recordCount: 0,
+        yearKey,
+      })
+    }
+
+    const year = years.get(yearKey)
+    year.months.push(month)
+    year.recordCount += month.recordCount
+    return years
+  }, new Map())
+
+  return Array.from(yearMap.values()).sort((a, b) =>
+    b.yearKey.localeCompare(a.yearKey),
   )
 }
 

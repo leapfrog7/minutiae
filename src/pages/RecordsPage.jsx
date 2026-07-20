@@ -5,7 +5,7 @@ import AppHeader from "../components/layout/AppHeader";
 import MonthRecordGroup from "../components/records/MonthRecordGroup";
 import { getCurrentMonthKey } from "../features/lifeItems/lifeItemHelpers";
 import {
-  groupRecordsByMonthAndDate,
+  groupRecordsByYearMonthAndDate,
   isVisibleRecord,
 } from "../features/lifeItems/recordArchiveHelpers";
 import {
@@ -73,19 +73,17 @@ const filterOptions = [
   { id: "document", label: "Records / Maintenance" },
 ];
 
-const initialVisibleMonthCount = 3;
-const olderMonthBatchSize = 3;
-
 function RecordsPage({ onNavigate }) {
   const [items, setItems] = useState(() => getLifeItems().filter(isVisibleRecord));
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [selectedItem, setSelectedItem] = useState(null);
-  const [visibleMonthCount, setVisibleMonthCount] = useState(
-    initialVisibleMonthCount,
+  const [selectedYear, setSelectedYear] = useState(() =>
+    getCurrentMonthKey().slice(0, 4),
   );
   const [openMonthKeys, setOpenMonthKeys] = useState(() => new Set());
   const [closedMonthKeys, setClosedMonthKeys] = useState(() => new Set());
+  const [openUpcomingYears, setOpenUpcomingYears] = useState(() => new Set());
 
   useEffect(
     () =>
@@ -128,27 +126,38 @@ function RecordsPage({ onNavigate }) {
     );
   }, [items, query, selectedType]);
 
-  const monthGroups = useMemo(
-    () => groupRecordsByMonthAndDate(filteredItems),
+  const yearGroups = useMemo(
+    () => groupRecordsByYearMonthAndDate(filteredItems),
     [filteredItems],
   );
   const currentMonthKey = getCurrentMonthKey();
-  const hasCurrentMonth = monthGroups.some(
-    (month) => month.monthKey === currentMonthKey,
+  const currentYearKey = currentMonthKey.slice(0, 4);
+  const orderedYearKeys = getOrderedYearKeys(yearGroups, currentYearKey);
+  const yearGroupByKey = new Map(
+    yearGroups.map((year) => [year.yearKey, year]),
   );
   const isSearchActive = query.trim().length > 0;
-  const visibleMonthGroups = isSearchActive
-    ? monthGroups
-    : monthGroups.slice(0, visibleMonthCount);
-  const hasHiddenMonths =
-    !isSearchActive && visibleMonthCount < monthGroups.length;
+  const activeYearKey = orderedYearKeys.includes(selectedYear)
+    ? selectedYear
+    : currentYearKey;
+  const selectedYearGroup = yearGroupByKey.get(activeYearKey);
+  const selectedMonths = selectedYearGroup?.months ?? [];
+  const historyMonths = selectedMonths.filter(
+    (month) => month.monthKey <= currentMonthKey,
+  );
+  const upcomingMonths = [...selectedMonths]
+    .filter((month) => month.monthKey > currentMonthKey)
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  const hasCurrentMonth = historyMonths.some(
+    (month) => month.monthKey === currentMonthKey,
+  );
   const activeFilterLabel =
     filterOptions.find((option) => option.id === selectedType)?.label ??
     "records";
   const hasItems = items.length > 0;
   const hasFilteredItems = filteredItems.length > 0;
 
-  function isMonthOpen(month, index) {
+  function isMonthOpen(month, index, isUpcoming = false) {
     if (isSearchActive) {
       return true;
     }
@@ -161,6 +170,10 @@ function RecordsPage({ onNavigate }) {
       return true;
     }
 
+    if (isUpcoming) {
+      return false;
+    }
+
     if (month.monthKey === currentMonthKey) {
       return true;
     }
@@ -168,8 +181,8 @@ function RecordsPage({ onNavigate }) {
     return index === 0 && !hasCurrentMonth;
   }
 
-  function toggleMonth(month, index) {
-    const isOpen = isMonthOpen(month, index);
+  function toggleMonth(month, index, isUpcoming = false) {
+    const isOpen = isMonthOpen(month, index, isUpcoming);
 
     if (isOpen) {
       setOpenMonthKeys((currentKeys) => {
@@ -197,8 +210,30 @@ function RecordsPage({ onNavigate }) {
     });
   }
 
-  function showOlderMonths() {
-    setVisibleMonthCount((count) => count + olderMonthBatchSize);
+  function selectYear(yearKey) {
+    setSelectedYear(yearKey);
+
+    if (yearKey > currentYearKey) {
+      setOpenUpcomingYears((currentYears) => {
+        const nextYears = new Set(currentYears);
+        nextYears.add(yearKey);
+        return nextYears;
+      });
+    }
+  }
+
+  function toggleUpcomingYear(yearKey) {
+    setOpenUpcomingYears((currentYears) => {
+      const nextYears = new Set(currentYears);
+
+      if (nextYears.has(yearKey)) {
+        nextYears.delete(yearKey);
+      } else {
+        nextYears.add(yearKey);
+      }
+
+      return nextYears;
+    });
   }
 
   return (
@@ -269,11 +304,49 @@ function RecordsPage({ onNavigate }) {
             })}
           </div>
 
+          {!isSearchActive && (
+            <div className="-mx-4 mb-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
+              <div className="flex min-w-max gap-2" role="tablist" aria-label="Record year">
+                {orderedYearKeys.map((yearKey) => {
+                  const year = yearGroupByKey.get(yearKey);
+                  const isActive = yearKey === activeYearKey;
+
+                  return (
+                    <button
+                      key={yearKey}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => selectYear(yearKey)}
+                      className={`rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                        isActive
+                          ? "bg-stone-900 text-white shadow-sm shadow-stone-900/20"
+                          : "bg-white text-stone-600 ring-1 ring-stone-200"
+                      }`}
+                    >
+                      {yearKey}
+                      {year && (
+                        <span className={`ml-2 text-xs ${isActive ? "text-stone-300" : "text-stone-400"}`}>
+                          {year.recordCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {isSearchActive && hasFilteredItems && (
-            <p className="mb-3 text-xs font-semibold text-stone-500">
-              {filteredItems.length}{" "}
-              {filteredItems.length === 1 ? "result" : "results"}
-            </p>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-stone-500">
+                {filteredItems.length}{" "}
+                {filteredItems.length === 1 ? "result" : "results"} across all years
+              </p>
+              <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-bold text-teal-700">
+                All years
+              </span>
+            </div>
           )}
 
           {!hasFilteredItems ? (
@@ -291,32 +364,78 @@ function RecordsPage({ onNavigate }) {
                     : `No ${activeFilterLabel.toLowerCase()} matched. Try another type or clear search.`
               }
             />
-          ) : (
-            <>
-              <div className="space-y-3">
-                {visibleMonthGroups.map((month, index) => (
-                  <MonthRecordGroup
-                    key={month.monthKey}
-                    isOpen={isMonthOpen(month, index)}
-                    month={month}
-                    onOpenItem={setSelectedItem}
-                    onToggle={() => toggleMonth(month, index)}
-                  />
-                ))}
-              </div>
+          ) : isSearchActive ? (
+            <div className="space-y-6">
+              {orderedYearKeys.map((yearKey) => {
+                const year = yearGroupByKey.get(yearKey);
 
-              {hasHiddenMonths && (
-                <div className="mt-4 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={showOlderMonths}
-                    className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-stone-700 shadow-sm shadow-stone-200/50 ring-1 ring-stone-200"
-                  >
-                    Load older months
-                  </button>
-                </div>
+                if (!year) {
+                  return null;
+                }
+
+                return (
+                  <section key={yearKey}>
+                    <YearSectionHeading count={year.recordCount} yearKey={yearKey} />
+                    <div className="space-y-3">
+                      {orderMonthsForRecords(year.months, currentMonthKey).map((month, index) => (
+                        <MonthRecordGroup
+                          key={month.monthKey}
+                          badge={getMonthBadge(month.monthKey, currentMonthKey)}
+                          collapsible={false}
+                          isOpen={isMonthOpen(month, index)}
+                          month={month}
+                          onOpenItem={setSelectedItem}
+                          onToggle={() => toggleMonth(month, index)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ) : selectedMonths.length > 0 ? (
+            <div className="space-y-5">
+              {historyMonths.length > 0 && (
+                <section>
+                  <div className="space-y-3">
+                    {historyMonths.map((month, index) => (
+                      <MonthRecordGroup
+                        key={month.monthKey}
+                        badge={getMonthBadge(month.monthKey, currentMonthKey)}
+                        isOpen={isMonthOpen(month, index)}
+                        month={month}
+                        onOpenItem={setSelectedItem}
+                        onToggle={() => toggleMonth(month, index)}
+                      />
+                    ))}
+                  </div>
+                </section>
               )}
-            </>
+
+              {upcomingMonths.length > 0 && (
+                <UpcomingMonthsSection
+                  isOpen={openUpcomingYears.has(activeYearKey)}
+                  months={upcomingMonths}
+                  onToggle={() => toggleUpcomingYear(activeYearKey)}
+                  renderMonth={(month, index) => (
+                    <MonthRecordGroup
+                      key={month.monthKey}
+                      badge="Scheduled"
+                      isOpen={isMonthOpen(month, index, true)}
+                      month={month}
+                      onOpenItem={setSelectedItem}
+                      onToggle={() => toggleMonth(month, index, true)}
+                    />
+                  )}
+                  yearKey={activeYearKey}
+                />
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              title={`No ${activeFilterLabel.toLowerCase()} in ${activeYearKey}`}
+              description="Choose another year or change the record type filter."
+            />
           )}
         </>
       )}
@@ -326,8 +445,104 @@ function RecordsPage({ onNavigate }) {
         onClose={() => setSelectedItem(null)}
         onItemDeleted={() => refreshItems(null)}
         onItemUpdated={refreshItems}
+        onNavigate={onNavigate}
       />
     </>
+  );
+}
+
+function getOrderedYearKeys(yearGroups, currentYearKey) {
+  const yearKeys = new Set([
+    currentYearKey,
+    ...yearGroups.map((year) => year.yearKey),
+  ]);
+  const pastYears = [...yearKeys]
+    .filter((yearKey) => yearKey < currentYearKey)
+    .sort((a, b) => b.localeCompare(a));
+  const futureYears = [...yearKeys]
+    .filter((yearKey) => yearKey > currentYearKey)
+    .sort((a, b) => a.localeCompare(b));
+
+  return [currentYearKey, ...pastYears, ...futureYears];
+}
+
+function getMonthBadge(monthKey, currentMonthKey) {
+  if (monthKey === currentMonthKey) {
+    return "Current";
+  }
+
+  if (monthKey > currentMonthKey) {
+    return "Scheduled";
+  }
+
+  return "";
+}
+
+function orderMonthsForRecords(months, currentMonthKey) {
+  const currentMonths = months.filter(
+    (month) => month.monthKey === currentMonthKey,
+  );
+  const pastMonths = months
+    .filter((month) => month.monthKey < currentMonthKey)
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  const futureMonths = months
+    .filter((month) => month.monthKey > currentMonthKey)
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+  return [...currentMonths, ...pastMonths, ...futureMonths];
+}
+
+function YearSectionHeading({ count, yearKey }) {
+  return (
+    <div className="mb-2 flex items-center justify-between gap-3 px-1">
+      <h2 className="text-sm font-black text-stone-950">{yearKey}</h2>
+      <span className="text-xs font-semibold text-stone-500">
+        {count} {count === 1 ? "record" : "records"}
+      </span>
+    </div>
+  );
+}
+
+function UpcomingMonthsSection({
+  isOpen,
+  months,
+  onToggle,
+  renderMonth,
+  yearKey,
+}) {
+  const recordCount = months.reduce(
+    (total, month) => total + month.recordCount,
+    0,
+  );
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60">
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
+      >
+        <span>
+          <span className="block text-sm font-black text-stone-950">
+            Upcoming in {yearKey}
+          </span>
+          <span className="mt-1 block text-xs font-semibold text-stone-600">
+            {months.length} {months.length === 1 ? "month" : "months"} - {recordCount}{" "}
+            {recordCount === 1 ? "scheduled item" : "scheduled items"}
+          </span>
+        </span>
+        <span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-amber-800 ring-1 ring-amber-200">
+          {isOpen ? "Hide" : "Show"}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="space-y-3 border-t border-amber-200/70 px-3 py-3">
+          {months.map((month, index) => renderMonth(month, index))}
+        </div>
+      )}
+    </section>
   );
 }
 

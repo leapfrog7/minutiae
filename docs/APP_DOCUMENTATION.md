@@ -233,7 +233,7 @@ Records page is a searchable household archive.
 
 It groups items:
 
-`Month -> Date -> Item cards`
+`Year -> Month -> Date -> Item cards`
 
 Record date is historical, not necessarily the next due date.
 
@@ -244,7 +244,7 @@ Search:
 - case-insensitive
 - partial text
 - includes practical household fields such as phone, UPI, complaint ID, policy number, relatedTo, notes, dates, payment mode, amount
-- when active, shows all matching months and bypasses the load-older limit
+- when active, searches across all years and expands matching months
 
 Month summaries show:
 
@@ -252,7 +252,9 @@ Month summaries show:
 - paid expense total out
 - received income total in
 
-Older months are progressively revealed via `Load older months`.
+The current year is selected first. Current and past months appear before a
+separate Upcoming section so future recurring items do not displace current
+records. Year tabs replace progressive month loading.
 
 ## Calendar
 
@@ -303,6 +305,8 @@ It supports:
 - snooze/remind later
 - bill cycle history
 - recurring next-reminder prompt
+- create a similar item with lifecycle and linked fields reset
+- share a safe text summary using the native share sheet or copy fallback
 - toast feedback
 
 Back gesture behavior should close nested overlays first:
@@ -400,7 +404,7 @@ Minutiae currently supports:
 - Received/expected income
 - Monthly money picture
 - Calendar agenda
-- Records month/date archive
+- Records year/month/date archive
 - Search and type filtering
 - Backup reminder/export/import
 - First-time onboarding
@@ -409,6 +413,8 @@ Minutiae currently supports:
 - Snooze/remind later
 - Duplicate warnings while adding
 - Bill previous-cycle history
+- Create Similar quick entry
+- Share Item Summary
 - Toast feedback
 - PWA basics and GitHub Pages deployment
 

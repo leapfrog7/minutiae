@@ -12,8 +12,9 @@ import {
 } from '../features/lifeItems/nextReminderFlow'
 import { addLifeItemWithLinkedExpense } from '../features/lifeItems/lifeItemStorage'
 
-function AddPage({ initialType = '' }) {
+function AddPage({ initialItem = null, initialType = '' }) {
   const [selectedType, setSelectedType] = useState(initialType)
+  const [similarDraft, setSimilarDraft] = useState(initialItem)
   const [pendingNextReminderItem, setPendingNextReminderItem] = useState(null)
   const [toast, setToast] = useState(null)
 
@@ -25,6 +26,7 @@ function AddPage({ initialType = '' }) {
 
       event.preventDefault()
       setSelectedType('')
+      setSimilarDraft(null)
     }
 
     window.addEventListener('minutiae:back', handleInternalBack)
@@ -35,6 +37,7 @@ function AddPage({ initialType = '' }) {
     try {
       const result = addLifeItemWithLinkedExpense(item, options)
       setSelectedType('')
+      setSimilarDraft(null)
       setToast({
         message: result.expenseCreated
           ? 'Saved and added to Money'
@@ -76,25 +79,34 @@ function AddPage({ initialType = '' }) {
     <>
       <AppHeader
         title={selectedType ? 'Add' : 'What do you want to add?'}
-        eyebrow="Capture a household item"
+        eyebrow={similarDraft ? 'Create a similar item' : 'Capture a household item'}
         description={
           selectedType
-            ? 'Add just enough detail to make this easy to find and follow up.'
+            ? similarDraft
+              ? 'Review the copied details, add the new date and save when ready.'
+              : 'Add just enough detail to make this easy to find and follow up.'
             : 'Add expenses, bills, income, investments, reminders, vendor payments, renewals or records.'
         }
       />
 
       {selectedType ? (
         <AddItemForm
-          key={selectedType}
+          key={`${selectedType}-${similarDraft ? 'similar' : 'new'}`}
+          initialItem={similarDraft}
           selectedType={selectedType}
-          onBack={() => setSelectedType('')}
+          onBack={() => {
+            setSelectedType('')
+            setSimilarDraft(null)
+          }}
           onSave={handleSave}
         />
       ) : (
         <AddItemTypeSelector
           itemTypes={itemTypes}
-          onSelectType={setSelectedType}
+          onSelectType={(type) => {
+            setSimilarDraft(null)
+            setSelectedType(type)
+          }}
         />
       )}
 

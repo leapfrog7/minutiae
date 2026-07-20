@@ -349,6 +349,7 @@ function HomePage({ onNavigate }) {
         onClose={() => setSelectedItem(null)}
         onItemDeleted={() => refreshItems(null)}
         onItemUpdated={refreshItems}
+        onNavigate={onNavigate}
       />
 
       {pendingPaidItem && (
