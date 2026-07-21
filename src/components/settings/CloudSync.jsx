@@ -40,7 +40,7 @@ function ConfiguredCloudSync({ onDataChanged }) {
 }
 
 function CloudAccountForm() {
-  const [mode, setMode] = useState('sign-in')
+  const [mode, setMode] = useState('sign-up')
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [state, setState] = useState({ busy: false, error: '' })
 
@@ -61,16 +61,27 @@ function CloudAccountForm() {
 
       window.location.reload()
     } catch (error) {
-      setState({ busy: false, error: error.message || 'Authentication failed.' })
+      setState({
+        busy: false,
+        error: getAuthErrorMessage(error, mode),
+      })
     }
   }
 
   return (
     <SectionCard eyebrow="Optional" title="Cloud sync">
       <p className="text-sm leading-6 text-stone-600">
-        Sign in to keep a private copy in your Minutiae cloud account. Nothing
+        Create a private Minutiae account or sign in to an existing one. Nothing
         is uploaded automatically.
       </p>
+      <div className="mt-3 grid grid-cols-2 rounded-lg bg-stone-100 p-1" role="tablist" aria-label="Cloud account">
+        <AccountModeTab active={mode === 'sign-up'} onClick={() => changeMode('sign-up')}>
+          Create account
+        </AccountModeTab>
+        <AccountModeTab active={mode === 'sign-in'} onClick={() => changeMode('sign-in')}>
+          Sign in
+        </AccountModeTab>
+      </div>
       <form onSubmit={submit} className="mt-3 grid gap-3">
         {mode === 'sign-up' && (
           <Field label="Name">
@@ -87,12 +98,40 @@ function CloudAccountForm() {
         <button type="submit" disabled={state.busy} className="rounded-xl bg-teal-700 px-4 py-3 text-sm font-bold text-white disabled:bg-stone-400">
           {state.busy ? 'Please wait...' : mode === 'sign-up' ? 'Create cloud account' : 'Sign in'}
         </button>
-        <button type="button" onClick={() => { setMode((current) => current === 'sign-in' ? 'sign-up' : 'sign-in'); setState({ busy: false, error: '' }) }} className="text-sm font-semibold text-teal-800">
-          {mode === 'sign-in' ? 'Create an account' : 'Use an existing account'}
-        </button>
       </form>
     </SectionCard>
   )
+
+  function changeMode(nextMode) {
+    setMode(nextMode)
+    setState({ busy: false, error: '' })
+  }
+}
+
+function AccountModeTab({ active, children, onClick }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`rounded-md px-3 py-2 text-sm font-bold transition ${
+        active ? 'bg-white text-stone-950 shadow-sm' : 'text-stone-500 hover:text-stone-800'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function getAuthErrorMessage(error, mode) {
+  const message = error?.message || 'Authentication failed.'
+
+  if (/invalid account/i.test(message) && mode === 'sign-in') {
+    return 'No account matches those details. Choose Create account if this is your first visit.'
+  }
+
+  return message
 }
 
 function CloudActions({ user, onDataChanged }) {
