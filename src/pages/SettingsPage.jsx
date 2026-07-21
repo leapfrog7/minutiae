@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import AppInfo from '../components/settings/AppInfo'
 import BackupRestore from '../components/settings/BackupRestore'
 import DataDangerZone from '../components/settings/DataDangerZone'
@@ -32,6 +32,8 @@ const statLabels = [
   ['document', 'Documents'],
   ['actionable', 'Open/actionable'],
 ]
+
+const CloudSync = lazy(() => import('../components/settings/CloudSync'))
 
 function SettingsPage({ onNavigate }) {
   const [items, setItems] = useState(getLifeItems)
@@ -118,6 +120,10 @@ function SettingsPage({ onNavigate }) {
 
           <BackupRestore onDataChanged={refreshItems} />
         </div>
+
+        <Suspense fallback={<SectionCard eyebrow="Optional" title="Cloud sync"><p className="text-sm text-stone-600">Loading cloud settings...</p></SectionCard>}>
+          <CloudSync onDataChanged={refreshItems} />
+        </Suspense>
 
         <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
           <AppInfo />

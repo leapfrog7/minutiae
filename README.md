@@ -1,16 +1,52 @@
-# React + Vite
+# Minutiae
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Minutiae is a local-first personal records application built with React and Vite. Records remain in the browser by default. Optional cloud sync uses Neon Auth and a Neon Postgres Data API connected through Vercel.
 
-Currently, two official plugins are available:
+## Data Model
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Local records remain the working copy in browser `localStorage`.
+- JSON export and import remain available without an account.
+- Signing in does not upload records automatically.
+- Cloud save and cloud restore are separate, confirmed actions.
+- Each authenticated user has one versioned JSON snapshot protected by PostgreSQL row-level security.
 
-## React Compiler
+## Local Development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```powershell
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+The app works without cloud environment variables. To enable cloud sync, create `.env.local` with:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```text
+VITE_NEON_AUTH_URL=https://your-project.auth.neon.tech
+VITE_NEON_DATA_API_URL=https://your-project.data-api.neon.tech
+DATABASE_URL=postgresql://...
+```
+
+When the project is linked to Vercel and Neon, pull the configured variables with:
+
+```powershell
+npx vercel env pull .env.local
+```
+
+Apply the database schema once:
+
+```powershell
+npm run db:migrate
+```
+
+## Verification
+
+```powershell
+npm test
+npm run lint
+npm run build
+```
+
+## Deployment
+
+The Vite base path is `/minutiae/` for the existing GitHub Pages build and `/` when Vercel sets its `VERCEL` build environment variable. Cloud credentials are injected through Vercel environment variables and must not be committed.
+
+The application is intended for personal, non-commercial use while hosted on Vercel Hobby. Do not store sensitive operational or official records without an approved hosting, security, retention and backup policy.
